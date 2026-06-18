@@ -1,0 +1,49 @@
+# Docker Compose template for running szurubooru from prebuilt GHCR images.
+#
+# Use one copy of this stack PER INSTANCE (e.g. one for NSFW, one for SFW).
+# Everything that differs between instances is supplied via environment
+# variables (see the matching .env / Portainer stack env), so both instances
+# share the exact same images and differ only by config + data + port.
+#
+# Replace OWNER below with your lowercased GitHub username/org, OR set it as a
+# stack environment variable (image refs already use ${OWNER}).
+services:
+
+  server:
+    image: ghcr.io/${OWNER}/szurubooru-server:latest
+    restart: always
+    depends_on:
+      - sql
+    environment:
+      POSTGRES_HOST: sql
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      THREADS: ${THREADS}
+      ## Uncomment for verbose SQL logs:
+      #LOG_SQL: 1
+    volumes:
+      - "${MOUNT_DATA}:/data"
+      # Per-instance config file on the host (see doc/DEPLOY-GHCR.md).
+      - "${MOUNT_CONFIG}:/opt/app/config.yaml:ro"
+
+  client:
+    image: ghcr.io/${OWNER}/szurubooru-client:latest
+    restart: always
+    depends_on:
+      - server
+    environment:
+      BACKEND_HOST: server
+      BASE_URL: ${BASE_URL}
+    volumes:
+      - "${MOUNT_DATA}:/data:ro"
+    ports:
+      - "${PORT}:80"
+
+  sql:
+    image: postgres:11-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - "${MOUNT_SQL}:/var/lib/postgresql/data"
