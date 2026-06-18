@@ -9,7 +9,9 @@ _search_executor = search.Executor(search.configs.PoolSearchConfig())
 
 def _serialize(ctx: rest.Context, pool: model.Pool) -> rest.Response:
     return pools.serialize_pool(
-        pool, options=serialization.get_serialization_options(ctx)
+        pool,
+        auth_user=ctx.user,
+        options=serialization.get_serialization_options(ctx),
     )
 
 

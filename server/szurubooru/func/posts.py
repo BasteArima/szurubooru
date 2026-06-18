@@ -7,6 +7,7 @@ import sqlalchemy as sa
 
 from szurubooru import config, db, errors, model, rest
 from szurubooru.func import (
+    auth,
     comments,
     files,
     image_hash,
@@ -266,6 +267,7 @@ class PostSerializer(serialization.BaseSerializer):
                 for post in [
                     serialize_micro_post(rel, self.auth_user)
                     for rel in self.post.relations
+                    if post_is_visible(rel, self.auth_user)
                 ]
             }.values(),
             key=lambda post: post["id"],
@@ -359,6 +361,23 @@ def serialize_micro_post(
     return serialize_post(
         post, auth_user=auth_user, options=["id", "thumbnailUrl"]
     )
+
+
+def post_is_visible(post: Optional[model.Post], auth_user: model.User) -> bool:
+    """Whether the given post may be seen by the user.
+
+    Unsafe-rated posts are only visible to users holding the
+    'posts:view:unsafe' privilege. This is the single chokepoint used by the
+    API and serializers so that unsafe media stays hidden everywhere (post
+    lists, single post view, relations, featured post and reverse search).
+    """
+    if not post:
+        return False
+    if post.safety != model.Post.SAFETY_UNSAFE:
+        return True
+    if "posts:view:unsafe" not in config.config["privileges"]:
+        return True
+    return auth.has_privilege(auth_user, "posts:view:unsafe")
 
 
 def get_post_count() -> int:

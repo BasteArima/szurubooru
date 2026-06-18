@@ -94,8 +94,11 @@ def sort_pools(pools: List[model.Pool]) -> List[model.Pool]:
 
 
 class PoolSerializer(serialization.BaseSerializer):
-    def __init__(self, pool: model.Pool) -> None:
+    def __init__(
+        self, pool: model.Pool, auth_user: Optional[model.User] = None
+    ) -> None:
         self.pool = pool
+        self.auth_user = auth_user
 
     def _serializers(self) -> Dict[str, Callable[[], Any]]:
         return {
@@ -136,25 +139,26 @@ class PoolSerializer(serialization.BaseSerializer):
 
     def serialize_posts(self) -> Any:
         return [
-            post
-            for post in [
-                posts.serialize_micro_post(rel, None)
-                for rel in self.pool.posts
-            ]
+            posts.serialize_micro_post(rel, self.auth_user)
+            for rel in self.pool.posts
+            if posts.post_is_visible(rel, self.auth_user)
         ]
 
 
 def serialize_pool(
-    pool: model.Pool, options: List[str] = []
+    pool: model.Pool,
+    auth_user: Optional[model.User] = None,
+    options: List[str] = [],
 ) -> Optional[rest.Response]:
     if not pool:
         return None
-    return PoolSerializer(pool).serialize(options)
+    return PoolSerializer(pool, auth_user).serialize(options)
 
 
 def serialize_micro_pool(pool: model.Pool) -> Optional[rest.Response]:
     return serialize_pool(
-        pool, options=["id", "names", "category", "description", "postCount"]
+        pool,
+        options=["id", "names", "category", "description", "postCount"],
     )
 
 

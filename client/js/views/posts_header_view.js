@@ -1,5 +1,6 @@
 "use strict";
 
+const api = require("../api.js");
 const events = require("../events.js");
 const settings = require("../models/settings.js");
 const keyboard = require("../util/keyboard.js");
@@ -174,6 +175,10 @@ class PostsHeaderView extends events.EventTarget {
         super();
 
         ctx.settings = settings.get();
+        // Hide the unsafe safety toggle from users who aren't allowed to see
+        // unsafe media (the server enforces this regardless; this just avoids
+        // showing a toggle that would yield no results).
+        ctx.canViewUnsafe = api.hasPrivilege("posts:view:unsafe");
         this._ctx = ctx;
         this._hostNode = ctx.hostNode;
         views.replaceContent(this._hostNode, template(ctx));

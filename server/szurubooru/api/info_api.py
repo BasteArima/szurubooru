@@ -52,6 +52,10 @@ def get_info(ctx: rest.Context, _params: Dict[str, str] = {}) -> rest.Response:
         },
     }
     if auth.has_privilege(ctx.user, "posts:view:featured"):
+        if post_feature and not posts.post_is_visible(
+            post_feature.post, ctx.user
+        ):
+            post_feature = None
         ret["featuredPost"] = (
             posts.serialize_post(post_feature.post, ctx.user)
             if post_feature

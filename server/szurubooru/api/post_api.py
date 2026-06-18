@@ -114,6 +114,10 @@ def create_snapshots_for_post(
 def get_post(ctx: rest.Context, params: Dict[str, str]) -> rest.Response:
     auth.verify_privilege(ctx.user, "posts:view")
     post = _get_post(params)
+    if not posts.post_is_visible(post, ctx.user):
+        raise posts.PostNotFoundError(
+            "Post %r not found." % _get_post_id(params)
+        )
     return _serialize_post(ctx, post)
 
 
@@ -208,6 +212,8 @@ def get_featured_post(
 ) -> rest.Response:
     auth.verify_privilege(ctx.user, "posts:view:featured")
     post = posts.try_get_featured_post()
+    if not posts.post_is_visible(post, ctx.user):
+        post = None
     return _serialize_post(ctx, post)
 
 
@@ -296,15 +302,18 @@ def get_posts_by_image(
     except (errors.ThirdPartyError, errors.ProcessingError):
         lookalikes = []
 
+    exact_post = posts.search_by_image_exact(content)
+    if not posts.post_is_visible(exact_post, ctx.user):
+        exact_post = None
+
     return {
-        "exactPost": _serialize_post(
-            ctx, posts.search_by_image_exact(content)
-        ),
+        "exactPost": _serialize_post(ctx, exact_post),
         "similarPosts": [
             {
                 "distance": distance,
                 "post": _serialize_post(ctx, post),
             }
             for distance, post in lookalikes
+            if posts.post_is_visible(post, ctx.user)
         ],
     }

@@ -2,8 +2,8 @@ from typing import Any, Dict, Optional, Tuple
 
 import sqlalchemy as sa
 
-from szurubooru import db, errors, model
-from szurubooru.func import util
+from szurubooru import config, db, errors, model
+from szurubooru.func import auth, util
 from szurubooru.search import criteria, tokens
 from szurubooru.search.configs import util as search_util
 from szurubooru.search.configs.base_search_config import (
@@ -177,6 +177,28 @@ class PostSearchConfig(BaseSearchConfig):
             else:
                 new_special_tokens.append(token)
         search_query.special_tokens = new_special_tokens
+
+        # Force-hide unsafe posts from users lacking the privilege. Appending
+        # a negated safety token means it is applied even if the user tries to
+        # explicitly search for `safety:unsafe` (they get no results instead).
+        # If the privilege is not defined in the config the restriction is
+        # disabled (config.yaml.dist always defines it in real deployments).
+        if (
+            self.user is not None
+            and "posts:view:unsafe" in config.config["privileges"]
+            and not auth.has_privilege(self.user, "posts:view:unsafe")
+        ):
+            criterion = criteria.PlainCriterion(
+                original_text=model.Post.SAFETY_UNSAFE,
+                value=model.Post.SAFETY_UNSAFE,
+            )
+            search_query.named_tokens.append(
+                tokens.NamedToken(
+                    name="safety",
+                    criterion=criterion,
+                    negated=True,
+                )
+            )
 
     def create_around_query(self) -> SaQuery:
         return db.session.query(model.Post).options(sa.orm.lazyload("*"))
