@@ -57,8 +57,11 @@
         <section class='search'>
             Search on
             <a href='http://iqdb.org/?url=<%- encodeURIComponent(ctx.post.fullContentUrl) %>'>IQDB</a> &middot;
+            <a href='https://saucenao.com/search.php?url=<%- encodeURIComponent(ctx.post.fullContentUrl) %>'>SauceNAO</a> &middot;
             <a href='https://danbooru.donmai.us/posts?tags=md5:<%- ctx.post.checksumMD5 %>'>Danbooru</a> &middot;
-            <a href='https://lens.google.com/uploadbyurl?url=<%- encodeURIComponent(ctx.post.fullContentUrl) %>'>Google Images</a>
+            <a href='https://lens.google.com/uploadbyurl?url=<%- encodeURIComponent(ctx.post.fullContentUrl) %>'>Google Lens</a> &middot;
+            <a href='https://yandex.com/images/search?rpt=imageview&url=<%- encodeURIComponent(ctx.post.fullContentUrl) %>'>Yandex</a> &middot;
+            <a href='https://unlimited.waifu2x.net/'>Waifu2x</a>
         </section>
 
         <section class='social'>
