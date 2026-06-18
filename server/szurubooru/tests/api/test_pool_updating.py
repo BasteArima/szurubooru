@@ -60,7 +60,9 @@ def test_simple_updating(user_factory, pool_factory, context_factory):
         pools.update_pool_category_name.assert_called_once_with(pool, "series")
         pools.update_pool_description.assert_called_once_with(pool, "desc")
         pools.update_pool_posts.assert_called_once_with(pool, [1, 2])
-        pools.serialize_pool.assert_called_once_with(pool, options=[])
+        pools.serialize_pool.assert_called_once_with(
+            pool, auth_user=auth_user, options=[]
+        )
         snapshots.modify.assert_called_once_with(pool, auth_user)
 
 

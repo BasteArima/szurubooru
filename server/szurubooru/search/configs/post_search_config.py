@@ -185,7 +185,7 @@ class PostSearchConfig(BaseSearchConfig):
         # disabled (config.yaml.dist always defines it in real deployments).
         if (
             self.user is not None
-            and "posts:view:unsafe" in config.config["privileges"]
+            and "posts:view:unsafe" in config.config.get("privileges", {})
             and not auth.has_privilege(self.user, "posts:view:unsafe")
         ):
             criterion = criteria.PlainCriterion(

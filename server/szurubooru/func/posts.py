@@ -375,7 +375,7 @@ def post_is_visible(post: Optional[model.Post], auth_user: model.User) -> bool:
         return False
     if post.safety != model.Post.SAFETY_UNSAFE:
         return True
-    if "posts:view:unsafe" not in config.config["privileges"]:
+    if "posts:view:unsafe" not in config.config.get("privileges", {}):
         return True
     return auth.has_privilege(auth_user, "posts:view:unsafe")
 
