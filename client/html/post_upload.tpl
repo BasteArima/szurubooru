@@ -21,6 +21,20 @@
                 }) %>
             </span>
 
+            <span class='auto-relate-similar'>
+                <%= ctx.makeCheckbox({
+                    text: 'Auto-relate similar ≥',
+                    name: 'auto-relate-similar',
+                    checked: false,
+                }) %><%= ctx.makeNumericInput({
+                    name: 'auto-relate-threshold',
+                    value: 60,
+                    min: 0,
+                    max: 100,
+                    step: 1,
+                }) %><span class='suffix'>%</span>
+            </span>
+
             <span class='pause-remain-on-error'>
                 <%= ctx.makeCheckbox({
                     text: 'Pause on error',

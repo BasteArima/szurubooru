@@ -57,6 +57,11 @@ class PostUploadController {
         this._view.clearMessages();
         let anyFailures = false;
 
+        let autoRelateThreshold = parseFloat(e.detail.autoRelateThreshold);
+        if (isNaN(autoRelateThreshold)) {
+            autoRelateThreshold = 60;
+        }
+
         e.detail.uploadables
             .reduce(
                 (promise, uploadable) =>
@@ -64,7 +69,9 @@ class PostUploadController {
                         this._uploadSinglePost(
                             uploadable,
                             e.detail.skipDuplicates,
-                            e.detail.alwaysUploadSimilar
+                            e.detail.alwaysUploadSimilar,
+                            e.detail.autoRelateSimilar,
+                            autoRelateThreshold
                         ).catch((error) => {
                             anyFailures = true;
                             if (error.uploadable) {
@@ -116,7 +123,13 @@ class PostUploadController {
             );
     }
 
-    _uploadSinglePost(uploadable, skipDuplicates, alwaysUploadSimilar) {
+    _uploadSinglePost(
+        uploadable,
+        skipDuplicates,
+        alwaysUploadSimilar,
+        autoRelateSimilar,
+        autoRelateThreshold
+    ) {
         progress.start();
         let reverseSearchPromise = Promise.resolve();
         if (!uploadable.lookalikesConfirmed) {
@@ -144,10 +157,24 @@ class PostUploadController {
                         }
                     }
 
+                    // auto-add relations to sufficiently similar posts
+                    if (autoRelateSimilar) {
+                        for (let item of searchResult.similarPosts) {
+                            const similarity = (1 - item.distance) * 100;
+                            if (
+                                similarity >= autoRelateThreshold &&
+                                !uploadable.relations.includes(item.post.id)
+                            ) {
+                                uploadable.relations.push(item.post.id);
+                            }
+                        }
+                    }
+
                     // notify about similar posts
                     if (
                         searchResult.similarPosts.length &&
-                        !alwaysUploadSimilar
+                        !alwaysUploadSimilar &&
+                        !autoRelateSimilar
                     ) {
                         let error = new Error(
                             `Found ${searchResult.similarPosts.length} similar ` +

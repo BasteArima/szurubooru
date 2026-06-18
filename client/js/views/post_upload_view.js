@@ -364,6 +364,10 @@ class PostUploadView extends events.EventTarget {
                     skipDuplicates: this._skipDuplicatesCheckboxNode.checked,
                     alwaysUploadSimilar:
                         this._alwaysUploadSimilarCheckboxNode.checked,
+                    autoRelateSimilar:
+                        this._autoRelateSimilarCheckboxNode.checked,
+                    autoRelateThreshold:
+                        this._autoRelateThresholdInputNode.value,
                     pauseRemainOnError:
                         this._pauseRemainOnErrorCheckboxNode.checked,
                 },
@@ -432,6 +436,16 @@ class PostUploadView extends events.EventTarget {
     get _alwaysUploadSimilarCheckboxNode() {
         return this._hostNode.querySelector(
             "form [name=always-upload-similar]"
+        );
+    }
+
+    get _autoRelateSimilarCheckboxNode() {
+        return this._hostNode.querySelector("form [name=auto-relate-similar]");
+    }
+
+    get _autoRelateThresholdInputNode() {
+        return this._hostNode.querySelector(
+            "form [name=auto-relate-threshold]"
         );
     }
 
