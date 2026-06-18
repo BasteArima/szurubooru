@@ -84,6 +84,10 @@ privileges:
     'posts:view:unsafe': nobody    # unsafe hidden from everyone, everywhere
 ```
 
+`posts:view:sketchy` works the same way for sketchy-rated media (default
+`anonymous`, i.e. everyone). Set it to e.g. `regular` to hide sketchy from
+guests, or `nobody` to hide it from everyone.
+
 Everything you don't override is inherited from the baked-in `config.yaml.dist`.
 
 ## 4. Create the stacks in Portainer

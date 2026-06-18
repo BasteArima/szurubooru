@@ -175,9 +175,10 @@ class PostsHeaderView extends events.EventTarget {
         super();
 
         ctx.settings = settings.get();
-        // Hide the unsafe safety toggle from users who aren't allowed to see
-        // unsafe media (the server enforces this regardless; this just avoids
-        // showing a toggle that would yield no results).
+        // Hide safety toggles from users who aren't allowed to see that rating
+        // (the server enforces this regardless; this just avoids showing a
+        // toggle that would yield no results).
+        ctx.canViewSketchy = api.hasPrivilege("posts:view:sketchy");
         ctx.canViewUnsafe = api.hasPrivilege("posts:view:unsafe");
         this._ctx = ctx;
         this._hostNode = ctx.hostNode;

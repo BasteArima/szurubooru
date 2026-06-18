@@ -363,21 +363,38 @@ def serialize_micro_post(
     )
 
 
+# Maps a post safety rating to the privilege required to view it. Ratings not
+# listed here (i.e. "safe") are always visible.
+SAFETY_VIEW_PRIVILEGE = {
+    model.Post.SAFETY_SKETCHY: "posts:view:sketchy",
+    model.Post.SAFETY_UNSAFE: "posts:view:unsafe",
+}
+
+
+def safety_is_visible(safety: str, auth_user: model.User) -> bool:
+    """Whether posts of the given safety rating may be seen by the user."""
+    privilege = SAFETY_VIEW_PRIVILEGE.get(safety)
+    if privilege is None:
+        return True
+    # If the privilege isn't defined in the config the restriction is disabled
+    # (config.yaml.dist always defines it in real deployments).
+    if privilege not in config.config.get("privileges", {}):
+        return True
+    return auth.has_privilege(auth_user, privilege)
+
+
 def post_is_visible(post: Optional[model.Post], auth_user: model.User) -> bool:
     """Whether the given post may be seen by the user.
 
-    Unsafe-rated posts are only visible to users holding the
-    'posts:view:unsafe' privilege. This is the single chokepoint used by the
-    API and serializers so that unsafe media stays hidden everywhere (post
-    lists, single post view, relations, featured post and reverse search).
+    Sketchy/unsafe-rated posts are only visible to users holding the
+    matching 'posts:view:<rating>' privilege. This is the single chokepoint
+    used by the API and serializers so that restricted media stays hidden
+    everywhere (post lists, single post view, relations, featured post and
+    reverse search).
     """
     if not post:
         return False
-    if post.safety != model.Post.SAFETY_UNSAFE:
-        return True
-    if "posts:view:unsafe" not in config.config.get("privileges", {}):
-        return True
-    return auth.has_privilege(auth_user, "posts:view:unsafe")
+    return safety_is_visible(post.safety, auth_user)
 
 
 def get_post_count() -> int:

@@ -100,6 +100,7 @@ privileges:
     'posts:reverse_search':         regular
     'posts:view':                   anonymous
     'posts:view:featured':          anonymous
+    'posts:view:sketchy':           anonymous # who may see sketchy-rated media anywhere (default: everyone)
     'posts:view:unsafe':            regular # who may see unsafe-rated media anywhere (lists, post view, relations, featured, reverse search)
     'posts:edit:content':           power
     'posts:edit:flags':             regular

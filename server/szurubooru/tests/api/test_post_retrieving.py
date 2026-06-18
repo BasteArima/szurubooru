@@ -218,3 +218,65 @@ def test_viewing_unsafe_single_privileged(
             {"post_id": 1},
         )
         assert result == "serialized post"
+
+
+@pytest.fixture
+def inject_sketchy_config(config_injector):
+    config_injector(
+        {
+            "privileges": {
+                "posts:list": "anonymous",
+                "posts:view": "anonymous",
+                "posts:view:sketchy": model.User.RANK_REGULAR,
+            },
+        }
+    )
+
+
+def test_listing_hides_sketchy_posts_from_unprivileged(
+    user_factory, post_factory, context_factory, inject_sketchy_config
+):
+    db.session.add(post_factory(id=1, safety=model.Post.SAFETY_SAFE))
+    db.session.add(post_factory(id=2, safety=model.Post.SAFETY_SKETCHY))
+    db.session.flush()
+    with patch("szurubooru.func.posts.serialize_post"):
+        posts.serialize_post.return_value = "serialized post"
+        result = api.post_api.get_posts(
+            context_factory(
+                params={"query": "", "offset": 0},
+                user=user_factory(rank=model.User.RANK_ANONYMOUS),
+            )
+        )
+        assert result["total"] == 1
+        assert result["results"] == ["serialized post"]
+
+
+def test_listing_shows_sketchy_posts_to_privileged(
+    user_factory, post_factory, context_factory, inject_sketchy_config
+):
+    db.session.add(post_factory(id=1, safety=model.Post.SAFETY_SAFE))
+    db.session.add(post_factory(id=2, safety=model.Post.SAFETY_SKETCHY))
+    db.session.flush()
+    with patch("szurubooru.func.posts.serialize_post"):
+        posts.serialize_post.return_value = "serialized post"
+        result = api.post_api.get_posts(
+            context_factory(
+                params={"query": "", "offset": 0},
+                user=user_factory(rank=model.User.RANK_REGULAR),
+            )
+        )
+        assert result["total"] == 2
+
+
+def test_trying_to_view_sketchy_single_unprivileged(
+    user_factory, post_factory, context_factory, inject_sketchy_config
+):
+    db.session.add(post_factory(id=1, safety=model.Post.SAFETY_SKETCHY))
+    db.session.flush()
+    with pytest.raises(posts.PostNotFoundError):
+        api.post_api.get_post(
+            context_factory(
+                user=user_factory(rank=model.User.RANK_ANONYMOUS)
+            ),
+            {"post_id": 1},
+        )
