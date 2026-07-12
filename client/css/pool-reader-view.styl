@@ -1,0 +1,130 @@
+@import colors
+
+.reader
+    position: fixed
+    top: 0
+    left: 0
+    right: 0
+    bottom: 0
+    z-index: 2000
+    display: flex
+    flex-direction: column
+    background: $window-color
+    color: $text-color
+
+    .reader-topbar
+        flex: 0 0 auto
+        display: flex
+        align-items: center
+        gap: 0.6em
+        padding: 0.4em 0.8em
+        background: $top-navigation-color
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25)
+        z-index: 1
+
+        .reader-back
+            font-size: 1.4em
+            line-height: 1
+            text-decoration: none
+
+        .reader-title
+            font-weight: bold
+            white-space: nowrap
+            overflow: hidden
+            text-overflow: ellipsis
+            max-width: 35%
+
+        .reader-counter
+            opacity: 0.8
+            white-space: nowrap
+
+        .reader-controls
+            margin-left: auto
+            display: flex
+            gap: 0.4em
+
+            .button
+                margin: 0
+
+    .reader-body
+        flex: 1 1 auto
+        overflow: auto
+        position: relative
+
+    .reader-loading
+        padding: 2em
+        text-align: center
+        opacity: 0.7
+
+    .reader-paged
+        position: relative
+        min-height: 100%
+        display: flex
+        align-items: center
+        justify-content: center
+
+        .reader-page
+            display: flex
+            align-items: center
+            justify-content: center
+
+            .reader-content
+                display: block
+
+        .reader-page.fit-both .reader-content
+            max-width: 100%
+            max-height: calc(100vh - 3.2em)
+            width: auto
+            height: auto
+
+        .reader-page.fit-width
+            width: 100%
+
+        .reader-page.fit-width .reader-content
+            width: 100%
+            max-width: 100%
+            height: auto
+
+        .reader-page.fit-height .reader-content
+            height: calc(100vh - 3.2em)
+            width: auto
+            max-width: none
+
+        .reader-edge
+            position: absolute
+            top: 0
+            bottom: 0
+            width: 20%
+            cursor: pointer
+            z-index: 5
+
+            &.prev
+                left: 0
+
+            &.next
+                right: 0
+
+    .reader-continuous
+        max-width: 900px
+        margin: 0 auto
+
+        .reader-cpage
+            width: 100%
+
+            .reader-content
+                display: block
+                width: 100%
+                height: auto
+                margin: 0 auto
+
+        .reader-placeholder
+            width: 100%
+            min-height: 80vh
+            background: rgba(127, 127, 127, 0.12)
+
+.darktheme .reader
+    background: $window-color-darktheme
+    color: $text-color-darktheme
+
+    .reader-topbar
+        background: $top-navigation-color-darktheme

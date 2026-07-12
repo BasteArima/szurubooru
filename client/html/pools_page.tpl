@@ -23,6 +23,7 @@
                         <a href='<%- ctx.formatClientLink('pools', {query: 'sort:creation-time'}) %>'>Created on</a>
                     <% } %>
                 </th>
+                <th class='read'>Read</th>
             </thead>
             <tbody>
                 <% for (let pool of ctx.response.results) { %>
@@ -39,6 +40,9 @@
                         </td>
                         <td class='creation-time'>
                             <%= ctx.makeRelativeTime(pool.creationTime) %>
+                        </td>
+                        <td class='read'>
+                            <a href='<%- ctx.formatClientLink('pool', pool.id, 'read') %>'>Read</a>
                         </td>
                     </tr>
                 <% } %>
