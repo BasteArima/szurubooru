@@ -19,6 +19,7 @@ const defaultSettings = {
     tagUnderscoresAsSpaces: false,
     darkTheme: true,
     postFlow: false,
+    poolsView: "grid",
 };
 
 class Settings extends events.EventTarget {

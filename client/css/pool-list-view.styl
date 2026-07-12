@@ -1,6 +1,56 @@
 @import colors
 
 .pool-list
+    .pool-list-controls
+        display: flex
+        justify-content: flex-end
+        margin-bottom: 0.8em
+
+    .view-toggle
+        a
+            padding: 0.1em 0.6em
+            font-size: 0.95em
+            &.active
+                font-weight: bold
+                text-decoration: underline
+            &:not(:last-child)
+                border-right: 1px solid rgba(127, 127, 127, 0.4)
+
+    table
+        width: 100%
+        border-spacing: 0
+        text-align: left
+        line-height: 1.3em
+        tr:hover td
+            background: $top-navigation-color
+        th, td
+            padding: 0.1em 0.5em
+        th
+            white-space: nowrap
+            background: $top-navigation-color
+        .names
+            width: 76%
+        .post-count
+            text-align: center
+            width: 8%
+        .creation-time
+            text-align: center
+            width: 8%
+            white-space: pre
+        .read
+            text-align: center
+            width: 8%
+        ul
+            list-style-type: none
+            margin: 0
+            padding: 0
+            display: inline
+            li
+                padding: 0
+                display: inline
+                &:not(:last-child):after
+                    content: ', '
+
     .sort-bar
         margin: 0 0 1em 0
         font-size: 0.95em
@@ -48,6 +98,21 @@
                 font-size: 0.8em
                 line-height: 1.5
 
+            .cover-badge
+                position: absolute
+                left: 6px
+                bottom: 6px
+                z-index: 1
+                max-width: calc(100% - 12px)
+                padding: 1px 7px
+                border-radius: 4px
+                background: rgba(0, 0, 0, 0.72)
+                font-size: 0.78em
+                line-height: 1.5
+                white-space: nowrap
+                overflow: hidden
+                text-overflow: ellipsis
+
         .title
             display: -webkit-box
             -webkit-line-clamp: 2
@@ -57,15 +122,15 @@
             font-weight: bold
             line-height: 1.25
 
-        .category
-            margin-top: 0.15em
-            font-size: 0.85em
-            opacity: 0.85
-
     .no-pools
         opacity: 0.7
 
 .darktheme .pool-list
+    table
+        tr:hover td
+            background: $top-navigation-color-darktheme
+        th
+            background: $top-navigation-color-darktheme
     .sort-bar
         color: $inactive-link-color-darktheme
 
