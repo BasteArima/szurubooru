@@ -54,6 +54,10 @@
                 </div>
             <% } %>
 
+            <div class='tags'>
+                <input class='tags-input' type='text' name='tags' placeholder='space-separated tags' value='<%- ctx.uploadable.tags.join(" ") %>'/>
+            </div>
+
             <div class='options'>
                 <% if (ctx.canUploadAnonymously) { %>
                     <div class='anonymous'>

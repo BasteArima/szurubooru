@@ -44,6 +44,10 @@
             </span>
 
             <input type='button' value='Cancel' class='cancel'/>
+
+            <span class='all-tags'>
+                <input type='text' name='all-tags' placeholder='Tags added to every uploaded post'/>
+            </span>
         </div>
 
         <div class='messages'></div>

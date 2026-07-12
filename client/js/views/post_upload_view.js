@@ -2,8 +2,10 @@
 
 const events = require("../events.js");
 const api = require("../api.js");
+const misc = require("../util/misc.js");
 const views = require("../util/views.js");
 const FileDropperControl = require("../controls/file_dropper_control.js");
+const TagAutoCompleteControl = require("../controls/tag_auto_complete_control.js");
 
 const template = views.getTemplate("post-upload");
 const rowTemplate = views.getTemplate("post-upload-row");
@@ -185,6 +187,25 @@ class PostUploadView extends events.EventTarget {
             this._evtFormSubmit(e)
         );
         this._formNode.classList.add("inactive");
+
+        this._installTagAutoComplete(this._allTagsInputNode);
+    }
+
+    _installTagAutoComplete(inputNode) {
+        if (!inputNode) {
+            return;
+        }
+        const control = new TagAutoCompleteControl(inputNode, {
+            confirm: (tag) =>
+                control.replaceSelectedText(tag.names[0], false),
+        });
+        // Enter in a tag field must not implicitly submit the form (which would
+        // start the upload); the autocomplete still handles Enter to confirm.
+        inputNode.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+            }
+        });
     }
 
     enableForm() {
@@ -306,7 +327,10 @@ class PostUploadView extends events.EventTarget {
             uploadable.anonymous = true;
         }
 
-        uploadable.tags = [];
+        const tagsNode = rowNode.querySelector(".tags-input");
+        uploadable.tags = tagsNode
+            ? misc.splitByWhitespace(tagsNode.value)
+            : [];
         uploadable.relations = [];
         for (let [i, lookalike] of uploadable.lookalikes.entries()) {
             let lookalikeNode = rowNode.querySelector(
@@ -321,6 +345,7 @@ class PostUploadView extends events.EventTarget {
                 uploadable.relations.push(lookalike.post.id);
             }
         }
+        uploadable.tags = [...new Set(uploadable.tags)];
     }
 
     _evtRemoveClick(e, uploadable) {
@@ -370,6 +395,9 @@ class PostUploadView extends events.EventTarget {
                         this._autoRelateThresholdInputNode.value,
                     pauseRemainOnError:
                         this._pauseRemainOnErrorCheckboxNode.checked,
+                    globalTags: this._allTagsInputNode
+                        ? misc.splitByWhitespace(this._allTagsInputNode.value)
+                        : [],
                 },
             })
         );
@@ -405,6 +433,8 @@ class PostUploadView extends events.EventTarget {
             .addEventListener("click", (e) =>
                 this._evtMoveClick(e, uploadable, 1)
             );
+
+        this._installTagAutoComplete(rowNode.querySelector(".tags-input"));
     }
 
     _updateThumbnailNode(uploadable) {
@@ -453,6 +483,10 @@ class PostUploadView extends events.EventTarget {
         return this._hostNode.querySelector(
             "form [name=pause-remain-on-error]"
         );
+    }
+
+    get _allTagsInputNode() {
+        return this._hostNode.querySelector("form [name=all-tags]");
     }
 
     get _submitButtonNode() {

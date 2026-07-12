@@ -62,6 +62,8 @@ class PostUploadController {
             autoRelateThreshold = 60;
         }
 
+        this._globalTags = e.detail.globalTags || [];
+
         e.detail.uploadables
             .reduce(
                 (promise, uploadable) =>
@@ -212,7 +214,10 @@ class PostUploadController {
         let post = new Post();
         post.safety = uploadable.safety;
         post.flags = uploadable.flags;
-        for (let tagName of uploadable.tags) {
+        const tagNames = Array.from(
+            new Set([...uploadable.tags, ...(this._globalTags || [])])
+        );
+        for (let tagName of tagNames) {
             const tag = new Tag();
             tag.names = [tagName];
             post.tags.add(tag);
