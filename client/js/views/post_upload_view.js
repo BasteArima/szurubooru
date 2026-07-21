@@ -4,8 +4,48 @@ const events = require("../events.js");
 const api = require("../api.js");
 const misc = require("../util/misc.js");
 const views = require("../util/views.js");
+const settings = require("../models/settings.js");
 const FileDropperControl = require("../controls/file_dropper_control.js");
 const TagAutoCompleteControl = require("../controls/tag_auto_complete_control.js");
+
+const defaultUploadSettings = {
+    skipDuplicates: false,
+    alwaysUploadSimilar: false,
+    autoRelateSimilar: false,
+    autoRelateThreshold: 60,
+    pauseRemainOnError: true,
+    defaultSafety: "safe",
+};
+
+function _uploadSettings() {
+    return Object.assign(
+        {},
+        defaultUploadSettings,
+        settings.get().upload || {}
+    );
+}
+
+function _formatFileSize(bytes) {
+    if (!bytes) {
+        return "";
+    }
+    const units = ["B", "KB", "MB", "GB"];
+    let value = bytes;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit++;
+    }
+    return (unit === 0 ? value : value.toFixed(1)) + " " + units[unit];
+}
+
+function _tagsFromName(name) {
+    return (name || "")
+        .replace(/\.[^.]+$/, "")
+        .split(/[\s_\-.,()\[\]]+/)
+        .map((token) => token.trim().toLowerCase())
+        .filter((token) => token.length > 1 && !/^\d+$/.test(token));
+}
 
 const template = views.getTemplate("post-upload");
 const rowTemplate = views.getTemplate("post-upload-row");
@@ -34,15 +74,22 @@ class Uploadable extends events.EventTarget {
         super();
         this.lookalikes = [];
         this.lookalikesConfirmed = false;
-        this.safety = "safe";
+        this.safety = _uploadSettings().defaultSafety;
         this.flags = [];
         this.tags = [];
         this.relations = [];
+        this.selected = false;
+        this.width = null;
+        this.height = null;
         this.anonymous = !api.isLoggedIn();
         this.forceAnonymous = !api.isLoggedIn();
     }
 
     destroy() {}
+
+    get size() {
+        return null;
+    }
 
     get mimeType() {
         return "application/octet-stream";
@@ -89,6 +136,10 @@ class File extends Uploadable {
 
     get mimeType() {
         return this.file.type;
+    }
+
+    get size() {
+        return this.file.size;
     }
 
     get previewUrl() {
@@ -188,7 +239,256 @@ class PostUploadView extends events.EventTarget {
         );
         this._formNode.classList.add("inactive");
 
+        this._lastSelectedIndex = null;
+        this._draggedUploadable = null;
+
         this._installTagAutoComplete(this._allTagsInputNode);
+        this._applyStoredSettings();
+        this._installSettingPersistence();
+        this._installBulkActions();
+        this._refreshSelectionInfo();
+    }
+
+    _applyStoredSettings() {
+        const stored = _uploadSettings();
+        this._skipDuplicatesCheckboxNode.checked = stored.skipDuplicates;
+        this._alwaysUploadSimilarCheckboxNode.checked =
+            stored.alwaysUploadSimilar;
+        this._autoRelateSimilarCheckboxNode.checked = stored.autoRelateSimilar;
+        this._autoRelateThresholdInputNode.value = stored.autoRelateThreshold;
+        this._pauseRemainOnErrorCheckboxNode.checked =
+            stored.pauseRemainOnError;
+    }
+
+    _saveUploadSettings(changes) {
+        settings.save(
+            { upload: Object.assign(_uploadSettings(), changes) },
+            true
+        );
+    }
+
+    _installSettingPersistence() {
+        const persist = () =>
+            this._saveUploadSettings({
+                skipDuplicates: this._skipDuplicatesCheckboxNode.checked,
+                alwaysUploadSimilar:
+                    this._alwaysUploadSimilarCheckboxNode.checked,
+                autoRelateSimilar:
+                    this._autoRelateSimilarCheckboxNode.checked,
+                autoRelateThreshold:
+                    parseFloat(this._autoRelateThresholdInputNode.value) || 60,
+                pauseRemainOnError:
+                    this._pauseRemainOnErrorCheckboxNode.checked,
+            });
+        for (let node of [
+            this._skipDuplicatesCheckboxNode,
+            this._alwaysUploadSimilarCheckboxNode,
+            this._autoRelateSimilarCheckboxNode,
+            this._autoRelateThresholdInputNode,
+            this._pauseRemainOnErrorCheckboxNode,
+        ]) {
+            node.addEventListener("change", persist);
+        }
+    }
+
+    _installBulkActions() {
+        const bulkNode = this._hostNode.querySelector(".bulk-strip");
+        if (!bulkNode) {
+            return;
+        }
+
+        bulkNode.querySelector(".select-all").addEventListener("click", (e) => {
+            e.preventDefault();
+            for (let uploadable of this._uploadables) {
+                this._setSelected(uploadable, true);
+            }
+            this._refreshSelectionInfo();
+        });
+
+        bulkNode
+            .querySelector(".select-none")
+            .addEventListener("click", (e) => {
+                e.preventDefault();
+                for (let uploadable of this._uploadables) {
+                    this._setSelected(uploadable, false);
+                }
+                this._lastSelectedIndex = null;
+                this._refreshSelectionInfo();
+            });
+
+        for (let node of bulkNode.querySelectorAll(
+            ".bulk-safety [data-safety]"
+        )) {
+            node.addEventListener("click", (e) => {
+                e.preventDefault();
+                this._applySafety(node.dataset.safety);
+            });
+        }
+
+        bulkNode
+            .querySelector(".bulk-tags-apply")
+            .addEventListener("click", (e) => {
+                e.preventDefault();
+                this._applyBulkTags();
+            });
+
+        bulkNode
+            .querySelector(".bulk-tags-filename")
+            .addEventListener("click", (e) => {
+                e.preventDefault();
+                this._applyTagsFromFilename();
+            });
+
+        bulkNode
+            .querySelector(".bulk-remove")
+            .addEventListener("click", (e) => {
+                e.preventDefault();
+                this._removeTargets();
+            });
+
+        bulkNode.querySelector(".clear-list").addEventListener("click", (e) => {
+            e.preventDefault();
+            if (this._uploading || !this._uploadables.length) {
+                return;
+            }
+            if (
+                !window.confirm(
+                    `Remove all ${this._uploadables.length} files from the ` +
+                        "upload list?"
+                )
+            ) {
+                return;
+            }
+            for (let uploadable of [...this._uploadables]) {
+                this.removeUploadable(uploadable);
+            }
+            this._refreshSelectionInfo();
+        });
+
+        this._installTagAutoComplete(
+            bulkNode.querySelector("[name=bulk-tags]")
+        );
+    }
+
+    _targetUploadables() {
+        const selected = this._uploadables.filter((u) => u.selected);
+        return selected.length ? selected : [...this._uploadables];
+    }
+
+    _setSelected(uploadable, value) {
+        uploadable.selected = value;
+        if (uploadable.rowNode) {
+            uploadable.rowNode.classList.toggle("selected", value);
+        }
+    }
+
+    _refreshSelectionInfo() {
+        const node = this._hostNode.querySelector(".selection-info");
+        if (!node) {
+            return;
+        }
+        const selected = this._uploadables.filter((u) => u.selected).length;
+        const total = this._uploadables.length;
+        node.textContent = selected
+            ? `Selected ${selected} of ${total} — actions apply to the selection`
+            : `Nothing selected — actions apply to all ${total}`;
+    }
+
+    _applySafety(safety) {
+        if (this._uploading) {
+            return;
+        }
+        for (let uploadable of this._targetUploadables()) {
+            uploadable.safety = safety;
+            const node =
+                uploadable.rowNode &&
+                uploadable.rowNode.querySelector(
+                    `.safety input[value="${safety}"]`
+                );
+            if (node) {
+                node.checked = true;
+            }
+        }
+        // also becomes the default for files added later
+        this._saveUploadSettings({ defaultSafety: safety });
+    }
+
+    _appendRowTags(uploadable, tags) {
+        const node =
+            uploadable.rowNode &&
+            uploadable.rowNode.querySelector(".tags-input");
+        if (!node) {
+            return;
+        }
+        const merged = [
+            ...new Set(misc.splitByWhitespace(node.value).concat(tags)),
+        ];
+        node.value = merged.join(" ");
+        uploadable.tags = merged;
+    }
+
+    _applyBulkTags() {
+        if (this._uploading) {
+            return;
+        }
+        const inputNode = this._hostNode.querySelector("[name=bulk-tags]");
+        const tags = inputNode ? misc.splitByWhitespace(inputNode.value) : [];
+        if (!tags.length) {
+            return;
+        }
+        for (let uploadable of this._targetUploadables()) {
+            this._appendRowTags(uploadable, tags);
+        }
+        inputNode.value = "";
+    }
+
+    _applyTagsFromFilename() {
+        if (this._uploading) {
+            return;
+        }
+        for (let uploadable of this._targetUploadables()) {
+            this._appendRowTags(uploadable, _tagsFromName(uploadable.name));
+        }
+    }
+
+    _removeTargets() {
+        if (this._uploading) {
+            return;
+        }
+        // deliberately selection-only: removing everything is what the
+        // explicit "Clear all" action is for
+        const selected = this._uploadables.filter((u) => u.selected);
+        if (!selected.length) {
+            return;
+        }
+        for (let uploadable of selected) {
+            this.removeUploadable(uploadable);
+        }
+        this._refreshSelectionInfo();
+    }
+
+    updateProgress(done, total) {
+        const node = this._hostNode.querySelector(".progress");
+        if (node) {
+            node.textContent = total ? `Uploaded ${done} / ${total}` : "";
+        }
+    }
+
+    setUploadableStatus(uploadable, status) {
+        if (!uploadable || !uploadable.rowNode) {
+            return;
+        }
+        const node = uploadable.rowNode.querySelector(".status");
+        if (node) {
+            node.textContent =
+                { uploading: "Uploading…", error: "Needs attention" }[
+                    status
+                ] || "";
+        }
+        uploadable.rowNode.classList.toggle(
+            "row-uploading",
+            status === "uploading"
+        );
     }
 
     _installTagAutoComplete(inputNode) {
@@ -269,6 +569,7 @@ class PostUploadView extends events.EventTarget {
             }
             alert(message);
         }
+        this._refreshSelectionInfo();
     }
 
     removeUploadable(uploadable) {
@@ -279,6 +580,8 @@ class PostUploadView extends events.EventTarget {
         uploadable.rowNode.parentNode.removeChild(uploadable.rowNode);
         this._uploadables.splice(this._uploadables.find(uploadable), 1);
         this._emit("change");
+        this._lastSelectedIndex = null;
+        this._refreshSelectionInfo();
         if (!this._uploadables.length) {
             this._formNode.classList.add("inactive");
             this._submitButtonNode.value = "Upload all";
@@ -435,6 +738,181 @@ class PostUploadView extends events.EventTarget {
             );
 
         this._installTagAutoComplete(rowNode.querySelector(".tags-input"));
+
+        if (uploadable.selected) {
+            rowNode.classList.add("selected");
+        }
+        rowNode.addEventListener("click", (e) =>
+            this._evtRowClick(e, uploadable)
+        );
+        this._installDragAndDrop(rowNode, uploadable);
+        this._installFileInfo(rowNode, uploadable);
+    }
+
+    _evtRowClick(e, uploadable) {
+        if (this._uploading) {
+            return;
+        }
+        // clicks meant for the row's own controls must not change the selection
+        if (
+            e.target.closest(
+                "input, textarea, select, label, a, button, video"
+            )
+        ) {
+            return;
+        }
+        const index = this._uploadables.find(uploadable);
+        if (e.shiftKey && this._lastSelectedIndex !== null) {
+            const from = Math.min(this._lastSelectedIndex, index);
+            const to = Math.max(this._lastSelectedIndex, index);
+            for (let i = from; i <= to; i++) {
+                this._setSelected(this._uploadables[i], true);
+            }
+        } else if (e.ctrlKey || e.metaKey) {
+            this._setSelected(uploadable, !uploadable.selected);
+            this._lastSelectedIndex = index;
+        } else {
+            for (let other of this._uploadables) {
+                this._setSelected(other, false);
+            }
+            this._setSelected(uploadable, true);
+            this._lastSelectedIndex = index;
+        }
+        this._refreshSelectionInfo();
+    }
+
+    _installDragAndDrop(rowNode, uploadable) {
+        const handleNode = rowNode.querySelector(".drag-handle");
+        if (handleNode) {
+            // only start a drag from the handle, so text selection inside the
+            // row's inputs keeps working
+            handleNode.addEventListener("mousedown", () => {
+                rowNode.draggable = true;
+            });
+            handleNode.addEventListener("mouseup", () => {
+                rowNode.draggable = false;
+            });
+        }
+
+        rowNode.addEventListener("dragstart", (e) => {
+            if (this._uploading) {
+                e.preventDefault();
+                return;
+            }
+            this._draggedUploadable = uploadable;
+            rowNode.classList.add("dragging");
+            if (e.dataTransfer) {
+                e.dataTransfer.effectAllowed = "move";
+                try {
+                    e.dataTransfer.setData("text/plain", uploadable.key);
+                } catch (error) {
+                    // some browsers refuse custom data; the drag still works
+                }
+            }
+        });
+
+        rowNode.addEventListener("dragend", () => {
+            rowNode.draggable = false;
+            rowNode.classList.remove("dragging");
+            this._draggedUploadable = null;
+            for (let other of this._uploadables) {
+                if (other.rowNode) {
+                    other.rowNode.classList.remove("drop-target");
+                }
+            }
+        });
+
+        rowNode.addEventListener("dragover", (e) => {
+            if (
+                !this._draggedUploadable ||
+                this._draggedUploadable === uploadable
+            ) {
+                return;
+            }
+            e.preventDefault();
+            if (e.dataTransfer) {
+                e.dataTransfer.dropEffect = "move";
+            }
+            rowNode.classList.add("drop-target");
+        });
+
+        rowNode.addEventListener("dragleave", () => {
+            rowNode.classList.remove("drop-target");
+        });
+
+        rowNode.addEventListener("drop", (e) => {
+            e.preventDefault();
+            rowNode.classList.remove("drop-target");
+            this._moveUploadableTo(this._draggedUploadable, uploadable);
+        });
+    }
+
+    _moveUploadableTo(dragged, target) {
+        if (!dragged || dragged === target) {
+            return;
+        }
+        const from = this._uploadables.find(dragged);
+        const to = this._uploadables.find(target);
+        if (from === -1 || to === -1) {
+            return;
+        }
+        this._uploadables.splice(from, 1);
+        this._uploadables.splice(to, 0, dragged);
+        if (from < to) {
+            this._listNode.insertBefore(
+                dragged.rowNode,
+                target.rowNode.nextSibling
+            );
+        } else {
+            this._listNode.insertBefore(dragged.rowNode, target.rowNode);
+        }
+    }
+
+    _installFileInfo(rowNode, uploadable) {
+        this._updateFileInfoNode(uploadable);
+        if (uploadable.width) {
+            return;
+        }
+        const imageNode = rowNode.querySelector(".thumbnail img");
+        if (imageNode) {
+            const onLoad = () => {
+                if (imageNode.naturalWidth) {
+                    uploadable.width = imageNode.naturalWidth;
+                    uploadable.height = imageNode.naturalHeight;
+                    this._updateFileInfoNode(uploadable);
+                }
+            };
+            if (imageNode.complete) {
+                onLoad();
+            } else {
+                imageNode.addEventListener("load", onLoad);
+            }
+        }
+        const videoNode = rowNode.querySelector("video");
+        if (videoNode) {
+            videoNode.addEventListener("loadedmetadata", () => {
+                uploadable.width = videoNode.videoWidth;
+                uploadable.height = videoNode.videoHeight;
+                this._updateFileInfoNode(uploadable);
+            });
+        }
+    }
+
+    _updateFileInfoNode(uploadable) {
+        const node =
+            uploadable.rowNode &&
+            uploadable.rowNode.querySelector(".file-info");
+        if (!node) {
+            return;
+        }
+        const parts = [];
+        if (uploadable.size) {
+            parts.push(_formatFileSize(uploadable.size));
+        }
+        if (uploadable.width && uploadable.height) {
+            parts.push(uploadable.width + "×" + uploadable.height);
+        }
+        node.textContent = parts.join(" · ");
     }
 
     _updateThumbnailNode(uploadable) {

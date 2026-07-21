@@ -20,6 +20,14 @@ const defaultSettings = {
     darkTheme: true,
     postFlow: false,
     poolsView: "grid",
+    upload: {
+        skipDuplicates: false,
+        alwaysUploadSimilar: false,
+        autoRelateSimilar: false,
+        autoRelateThreshold: 60,
+        pauseRemainOnError: true,
+        defaultSafety: "safe",
+    },
 };
 
 class Settings extends events.EventTarget {

@@ -17,6 +17,8 @@ $cancel-button-color = tomato
         &.inactive .auto-relate-similar
         &.inactive .pause-remain-on-error
         &.inactive .all-tags
+        &.inactive .bulk-strip
+        &.uploading .bulk-strip
         &.uploading input[type=submit],
         &.uploading .skip-duplicates,
         &.uploading .always-upload-similar
@@ -74,6 +76,63 @@ $cancel-button-color = tomato
         input
             width: 100%
             box-sizing: border-box
+
+    .progress
+        margin-left: 1em
+        font-size: 0.95em
+        opacity: 0.85
+
+    .bulk-strip
+        margin-top: 0.8em
+        padding: 0.5em 0.6em
+        border: 1px solid $upload-border-color
+        border-radius: 4px
+        font-size: 0.95em
+
+        .selection-info
+            opacity: 0.75
+            margin-bottom: 0.35em
+
+        .bulk-actions
+            display: flex
+            flex-wrap: wrap
+            align-items: center
+            gap: 0.45em
+
+            .sep
+                opacity: 0.35
+
+            input[name=bulk-tags]
+                width: 12em
+                padding: 0.15em 0.35em
+
+    .uploadable-container
+        &.selected
+            outline: 2px solid $main-color
+            outline-offset: 1px
+
+        &.dragging
+            opacity: 0.5
+
+        &.drop-target
+            border-top: 2px solid $main-color
+
+        .drag-handle
+            cursor: grab
+            padding: 0 0.5em
+            opacity: 0.6
+            &:hover
+                opacity: 1
+
+        .file-info
+            margin-left: 0.6em
+            font-size: 0.85em
+            opacity: 0.7
+
+        .status
+            margin-left: 0.6em
+            font-size: 0.85em
+            opacity: 0.85
 
     form>.messages
         margin-top: 1em

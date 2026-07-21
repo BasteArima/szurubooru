@@ -64,46 +64,63 @@ class PostUploadController {
 
         this._globalTags = e.detail.globalTags || [];
 
+        const total = e.detail.uploadables.length;
+        let uploaded = 0;
+        this._view.updateProgress(0, total);
+
         e.detail.uploadables
             .reduce(
                 (promise, uploadable) =>
-                    promise.then(() =>
-                        this._uploadSinglePost(
+                    promise.then(() => {
+                        this._view.setUploadableStatus(
+                            uploadable,
+                            "uploading"
+                        );
+                        return this._uploadSinglePost(
                             uploadable,
                             e.detail.skipDuplicates,
                             e.detail.alwaysUploadSimilar,
                             e.detail.autoRelateSimilar,
                             autoRelateThreshold
-                        ).catch((error) => {
-                            anyFailures = true;
-                            if (error.uploadable) {
-                                if (error.similarPosts) {
-                                    error.uploadable.lookalikes =
-                                        error.similarPosts;
-                                    this._view.updateUploadable(
-                                        error.uploadable
-                                    );
-                                    this._view.showInfo(
-                                        error.message,
-                                        error.uploadable
-                                    );
+                        )
+                            .then(() => {
+                                uploaded += 1;
+                                this._view.updateProgress(uploaded, total);
+                            })
+                            .catch((error) => {
+                                anyFailures = true;
+                                this._view.setUploadableStatus(
+                                    uploadable,
+                                    "error"
+                                );
+                                if (error.uploadable) {
+                                    if (error.similarPosts) {
+                                        error.uploadable.lookalikes =
+                                            error.similarPosts;
+                                        this._view.updateUploadable(
+                                            error.uploadable
+                                        );
+                                        this._view.showInfo(
+                                            error.message,
+                                            error.uploadable
+                                        );
+                                    } else {
+                                        this._view.showError(
+                                            error.message,
+                                            error.uploadable
+                                        );
+                                    }
                                 } else {
                                     this._view.showError(
                                         error.message,
-                                        error.uploadable
+                                        uploadable
                                     );
                                 }
-                            } else {
-                                this._view.showError(
-                                    error.message,
-                                    uploadable
-                                );
-                            }
-                            if (e.detail.pauseRemainOnError) {
-                                return Promise.reject();
-                            }
-                        })
-                    ),
+                                if (e.detail.pauseRemainOnError) {
+                                    return Promise.reject();
+                                }
+                            });
+                    }),
                 Promise.resolve()
             )
             .then(() => {
