@@ -36,11 +36,17 @@ def get_mime_type(content: bytes) -> str:
     if content[0:4] == b"\x1A\x45\xDF\xA3":
         return "video/webm"
 
-    if content[4:12] in (b"ftypisom", b"ftypiso5", b"ftypiso6", b"ftypmp42", b"ftypM4V "):
+    # Anything left carrying an ISO-BMFF `ftyp` box is a video container.
+    # Whitelisting brands (isom/mp42/...) missed the many other brands muxers
+    # emit in the wild (mp41, iso2, avc1, M4V_, dash, ...), so recognise the
+    # box itself instead. Image brands (avif/heif/heic) are matched above.
+    if content[4:8] == b"ftyp":
+        if content[8:12] == b"qt  ":
+            return "video/quicktime"
+        # audio-only MPEG-4 has no video stream szurubooru could handle
+        if content[8:11] == b"M4A":
+            return "application/octet-stream"
         return "video/mp4"
-
-    if content[4:12] == b"ftypqt  ":
-        return "video/quicktime"
 
     return "application/octet-stream"
 

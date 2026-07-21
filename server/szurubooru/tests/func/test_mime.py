@@ -31,6 +31,48 @@ def test_get_mime_type_for_empty_file():
     assert mime.get_mime_type(b"") == "application/octet-stream"
 
 
+def _iso_bmff(brand):
+    return b"\x00\x00\x00\x18ftyp" + brand + b"\x00" * 16
+
+
+@pytest.mark.parametrize(
+    "brand,expected_mime_type",
+    [
+        (b"isom", "video/mp4"),
+        (b"iso2", "video/mp4"),
+        (b"iso5", "video/mp4"),
+        (b"iso6", "video/mp4"),
+        (b"mp41", "video/mp4"),
+        (b"mp42", "video/mp4"),
+        (b"avc1", "video/mp4"),
+        (b"dash", "video/mp4"),
+        (b"M4V ", "video/mp4"),
+        (b"M4VP", "video/mp4"),
+        (b"qt  ", "video/quicktime"),
+    ],
+)
+def test_get_mime_type_for_iso_bmff_brands(brand, expected_mime_type):
+    assert mime.get_mime_type(_iso_bmff(brand)) == expected_mime_type
+
+
+@pytest.mark.parametrize(
+    "brand,expected_mime_type",
+    [
+        (b"avif", "image/avif"),
+        (b"avis", "image/avif"),
+        (b"mif1", "image/heif"),
+        (b"heic", "image/heic"),
+        (b"heix", "image/heic"),
+    ],
+)
+def test_image_brands_win_over_generic_ftyp(brand, expected_mime_type):
+    assert mime.get_mime_type(_iso_bmff(brand)) == expected_mime_type
+
+
+def test_get_mime_type_for_audio_only_mpeg4():
+    assert mime.get_mime_type(_iso_bmff(b"M4A ")) == "application/octet-stream"
+
+
 @pytest.mark.parametrize(
     "mime_type,expected_extension",
     [
