@@ -1,9 +1,17 @@
 @import colors
 
 .post-overlay
+    // the overlay sits on top of the media, so let clicks fall through to the
+    // image below - otherwise the browser shows the page context menu instead
+    // of the image one. Note polygons opt back in via pointer-events: auto,
+    // and the drawing states below re-enable the whole canvas.
+    pointer-events: none
+
     &[data-state=ready-to-draw],
     &[data-state=drawing-rectangle],
     &[data-state=drawing-polygon]
+        pointer-events: auto
+
         &:after
             box-sizing: border-box
             border: 0.3em dashed $active-note-overlay-border-color

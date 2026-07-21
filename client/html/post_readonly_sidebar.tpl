@@ -24,6 +24,12 @@
                 --><% if (ctx.post.flags.includes('loop')) { %><i class='fa fa-repeat'></i><% } %><!--
                 --><% if (ctx.post.flags.includes('sound')) { %><i class='fa fa-volume-up'></i><% } %>
             <% } %>
+
+            <a class='save-original' href='<%- ctx.post.contentUrl %>'
+                download='post-<%- ctx.post.id %>.<%- ctx.post.contentUrl.split("?")[0].split(".").pop() %>'
+                title='Save the original file to disk'><!--
+                --><i class='fa fa-save'></i>Save original<!--
+            --></a>
         </section>
 
         <section class='upload-info'>
