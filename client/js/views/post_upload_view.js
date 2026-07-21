@@ -15,6 +15,7 @@ const defaultUploadSettings = {
     autoRelateThreshold: 60,
     pauseRemainOnError: true,
     defaultSafety: "safe",
+    optionsOpen: false,
 };
 
 function _uploadSettings() {
@@ -258,6 +259,12 @@ class PostUploadView extends events.EventTarget {
         this._autoRelateThresholdInputNode.value = stored.autoRelateThreshold;
         this._pauseRemainOnErrorCheckboxNode.checked =
             stored.pauseRemainOnError;
+
+        const optionsNode = this._hostNode.querySelector(".upload-options");
+        if (optionsNode) {
+            optionsNode.classList.toggle("open", !!stored.optionsOpen);
+        }
+        this._updateDefaultSafetyUI(stored.defaultSafety);
     }
 
     _saveUploadSettings(changes) {
@@ -292,6 +299,27 @@ class PostUploadView extends events.EventTarget {
     }
 
     _installBulkActions() {
+        const optionsNode = this._hostNode.querySelector(".upload-options");
+        const optionsToggleNode =
+            optionsNode && optionsNode.querySelector(".upload-options-toggle");
+        if (optionsToggleNode) {
+            optionsToggleNode.addEventListener("click", (e) => {
+                e.preventDefault();
+                const open = !optionsNode.classList.contains("open");
+                optionsNode.classList.toggle("open", open);
+                this._saveUploadSettings({ optionsOpen: open });
+            });
+        }
+
+        for (let node of this._hostNode.querySelectorAll(
+            ".default-safety [data-safety]"
+        )) {
+            node.addEventListener("click", (e) => {
+                e.preventDefault();
+                this._applySafetyToAll(node.dataset.safety);
+            });
+        }
+
         const bulkNode = this._hostNode.querySelector(".bulk-strip");
         if (!bulkNode) {
             return;
@@ -317,11 +345,14 @@ class PostUploadView extends events.EventTarget {
             });
 
         for (let node of bulkNode.querySelectorAll(
-            ".bulk-safety [data-safety]"
+            ".selection-safety [data-safety]"
         )) {
             node.addEventListener("click", (e) => {
                 e.preventDefault();
-                this._applySafety(node.dataset.safety);
+                this._applySafetyTo(
+                    this._selectedUploadables(),
+                    node.dataset.safety
+                );
             });
         }
 
@@ -370,9 +401,8 @@ class PostUploadView extends events.EventTarget {
         );
     }
 
-    _targetUploadables() {
-        const selected = this._uploadables.filter((u) => u.selected);
-        return selected.length ? selected : [...this._uploadables];
+    _selectedUploadables() {
+        return this._uploadables.filter((u) => u.selected);
     }
 
     _setSelected(uploadable, value) {
@@ -383,22 +413,27 @@ class PostUploadView extends events.EventTarget {
     }
 
     _refreshSelectionInfo() {
-        const node = this._hostNode.querySelector(".selection-info");
-        if (!node) {
+        const bulkNode = this._hostNode.querySelector(".bulk-strip");
+        if (!bulkNode) {
             return;
         }
-        const selected = this._uploadables.filter((u) => u.selected).length;
+        const selected = this._selectedUploadables().length;
         const total = this._uploadables.length;
-        node.textContent = selected
-            ? `Selected ${selected} of ${total} — actions apply to the selection`
-            : `Nothing selected — actions apply to all ${total}`;
+        const infoNode = bulkNode.querySelector(".selection-info");
+        if (infoNode) {
+            infoNode.textContent = selected
+                ? `${selected} of ${total} selected`
+                : `${total} file(s) — click a row to select`;
+        }
+        // the per-selection actions only make sense with a selection
+        bulkNode.classList.toggle("has-selection", selected > 0);
     }
 
-    _applySafety(safety) {
+    _applySafetyTo(uploadables, safety) {
         if (this._uploading) {
             return;
         }
-        for (let uploadable of this._targetUploadables()) {
+        for (let uploadable of uploadables) {
             uploadable.safety = safety;
             const node =
                 uploadable.rowNode &&
@@ -409,8 +444,24 @@ class PostUploadView extends events.EventTarget {
                 node.checked = true;
             }
         }
+    }
+
+    _applySafetyToAll(safety) {
+        if (this._uploading) {
+            return;
+        }
+        this._applySafetyTo(this._uploadables, safety);
         // also becomes the default for files added later
         this._saveUploadSettings({ defaultSafety: safety });
+        this._updateDefaultSafetyUI(safety);
+    }
+
+    _updateDefaultSafetyUI(safety) {
+        for (let node of this._hostNode.querySelectorAll(
+            ".default-safety [data-safety]"
+        )) {
+            node.classList.toggle("active", node.dataset.safety === safety);
+        }
     }
 
     _appendRowTags(uploadable, tags) {
@@ -436,7 +487,7 @@ class PostUploadView extends events.EventTarget {
         if (!tags.length) {
             return;
         }
-        for (let uploadable of this._targetUploadables()) {
+        for (let uploadable of this._selectedUploadables()) {
             this._appendRowTags(uploadable, tags);
         }
         inputNode.value = "";
@@ -446,7 +497,7 @@ class PostUploadView extends events.EventTarget {
         if (this._uploading) {
             return;
         }
-        for (let uploadable of this._targetUploadables()) {
+        for (let uploadable of this._selectedUploadables()) {
             this._appendRowTags(uploadable, _tagsFromName(uploadable.name));
         }
     }
@@ -456,8 +507,8 @@ class PostUploadView extends events.EventTarget {
             return;
         }
         // deliberately selection-only: removing everything is what the
-        // explicit "Clear all" action is for
-        const selected = this._uploadables.filter((u) => u.selected);
+        // explicit "Clear list" action is for
+        const selected = this._selectedUploadables();
         if (!selected.length) {
             return;
         }

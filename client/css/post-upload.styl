@@ -12,19 +12,13 @@ $cancel-button-color = tomato
         text-align: left
 
         &.inactive input[type=submit],
-        &.inactive .skip-duplicates
-        &.inactive .always-upload-similar
-        &.inactive .auto-relate-similar
-        &.inactive .pause-remain-on-error
-        &.inactive .all-tags
-        &.inactive .bulk-strip
-        &.uploading .bulk-strip
+        &.inactive .batch-defaults,
+        &.inactive .upload-options,
+        &.inactive .bulk-strip,
         &.uploading input[type=submit],
-        &.uploading .skip-duplicates,
-        &.uploading .always-upload-similar
-        &.uploading .auto-relate-similar
-        &.uploading .pause-remain-on-error
-        &.uploading .all-tags
+        &.uploading .batch-defaults,
+        &.uploading .upload-options,
+        &.uploading .bulk-strip,
         &:not(.uploading) .cancel
             display: none
 
@@ -36,40 +30,146 @@ $cancel-button-color = tomato
             small
                 font-size: 60%
 
-    input[type=submit]
+    .primary-bar
+        display: flex
+        align-items: center
+        gap: 0.6em
         margin-top: 1em
 
+        input[type=submit],
+        .cancel
+            margin: 0
+
+        .progress
+            margin-left: auto
+            font-size: 0.95em
+            opacity: 0.8
+
     .cancel
-        margin-top: 1em
         background: $cancel-button-color
         border-color: $cancel-button-color
         &:focus
             border: 2px solid $text-color
 
-    .skip-duplicates
-        margin-left: 1em
+    .segmented
+        display: inline-flex
+        border: 1px solid $upload-border-color
+        border-radius: 4px
+        overflow: hidden
 
-    .always-upload-similar
-        margin-left: 1em
+        a
+            padding: 0.15em 0.85em
+            font-size: 0.95em
+            text-decoration: none
+            &:not(:last-child)
+                border-right: 1px solid $upload-border-color
+            &.active
+                background: $main-color
+                color: white
 
-    .auto-relate-similar
-        margin-left: 1em
-        input[type=number]
-            width: 3.5em
-            margin: 0 0.3em
-            padding: 0.2em 0.3em
-        .suffix
-            margin-left: -0.1em
+    .action
+        padding: 0.15em 0.7em
+        border: 1px solid $upload-border-color
+        border-radius: 4px
+        text-decoration: none
+        &.danger
+            color: $cancel-button-color
+            border-color: $cancel-button-color
 
-    .pause-remain-on-error
-        margin-left: 1em
+    .batch-defaults
+        margin-top: 0.9em
 
-    .all-tags
-        display: block
-        margin-top: 0.8em
-        input
-            width: 100%
+        .field
+            display: flex
+            align-items: center
+            gap: 0.6em
+            margin-bottom: 0.45em
+
+        .field-label
+            flex: 0 0 7.5em
+            font-size: 0.95em
+            opacity: 0.75
+
+        input[type=text]
+            flex: 1 1 auto
             box-sizing: border-box
+
+    .upload-options
+        margin-top: 0.7em
+
+        .upload-options-toggle
+            font-size: 0.95em
+            &:before
+                content: '\25b8\00a0'
+
+        &.open .upload-options-toggle:before
+            content: '\25be\00a0'
+
+        .upload-options-body
+            display: none
+            margin-top: 0.5em
+            padding: 0.5em 0.7em
+            border: 1px solid $upload-border-color
+            border-radius: 4px
+
+            >span
+                display: inline-block
+                margin: 0.15em 1.3em 0.15em 0
+
+            input[type=number]
+                width: 3.5em
+                margin: 0 0.3em
+                padding: 0.2em 0.3em
+
+            .suffix
+                margin-left: -0.1em
+
+        &.open .upload-options-body
+            display: block
+
+    .bulk-strip
+        margin-top: 0.9em
+        padding: 0.5em 0.7em
+        border: 1px solid $upload-border-color
+        border-radius: 4px
+        font-size: 0.95em
+
+        .selection-bar
+            display: flex
+            align-items: center
+            gap: 0.8em
+
+            .selection-info
+                opacity: 0.75
+
+            .selection-links
+                margin-left: auto
+                display: flex
+                gap: 0.9em
+
+        .selection-actions
+            display: none
+            flex-wrap: wrap
+            align-items: center
+            gap: 0.5em 1.3em
+            margin-top: 0.6em
+            padding-top: 0.6em
+            border-top: 1px solid $upload-border-color
+
+            .group
+                display: inline-flex
+                align-items: center
+                gap: 0.4em
+
+            .group-label
+                opacity: 0.7
+
+            input[name=bulk-tags]
+                width: 11em
+                padding: 0.15em 0.35em
+
+        &.has-selection .selection-actions
+            display: flex
 
     .uploadable .tags
         margin: 0.4em 0
@@ -77,60 +177,31 @@ $cancel-button-color = tomato
             width: 100%
             box-sizing: border-box
 
-    .progress
-        margin-left: 1em
-        font-size: 0.95em
-        opacity: 0.85
-
-    .bulk-strip
-        margin-top: 0.8em
-        padding: 0.5em 0.6em
-        border: 1px solid $upload-border-color
-        border-radius: 4px
-        font-size: 0.95em
-
-        .selection-info
-            opacity: 0.75
-            margin-bottom: 0.35em
-
-        .bulk-actions
-            display: flex
-            flex-wrap: wrap
-            align-items: center
-            gap: 0.45em
-
-            .sep
-                opacity: 0.35
-
-            input[name=bulk-tags]
-                width: 12em
-                padding: 0.15em 0.35em
-
     .uploadable-container
-        &.selected
-            outline: 2px solid $main-color
-            outline-offset: 1px
+        &.selected .uploadable
+            border-color: $main-color
+            box-shadow: 0 0 0 1px $main-color
 
         &.dragging
             opacity: 0.5
 
-        &.drop-target
+        &.drop-target .uploadable
             border-top: 2px solid $main-color
 
         .drag-handle
             cursor: grab
-            padding: 0 0.5em
-            opacity: 0.6
+            padding: 0 0.4em
+            opacity: 0.55
             &:hover
                 opacity: 1
 
         .file-info
-            margin-left: 0.6em
+            padding: 0 0.5em
             font-size: 0.85em
-            opacity: 0.7
+            opacity: 0.65
 
         .status
-            margin-left: 0.6em
+            padding: 0 0.5em
             font-size: 0.85em
             opacity: 0.85
 
