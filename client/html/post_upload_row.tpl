@@ -37,10 +37,12 @@
                 </ul>
             </nav>
 
-            <span class='drag-handle' title='Drag to reorder'><i class='fa fa-bars'></i></span>
-            <span class='filename'><%- ctx.uploadable.name %></span>
-            <span class='file-info'></span>
-            <span class='status'></span>
+            <span class='file-line'>
+                <span class='drag-handle' title='Drag to reorder'><i class='fa fa-bars'></i></span>
+                <span class='filename'><%- ctx.uploadable.name %></span>
+                <span class='file-info'></span>
+                <span class='status'></span>
+            </span>
         </header>
 
         <div class='body'>

@@ -189,19 +189,22 @@ $cancel-button-color = tomato
             border-top: 2px solid $main-color
 
         .drag-handle
+            flex: 0 0 auto
             cursor: grab
-            padding: 0 0.4em
+            padding: 0 0.2em
             opacity: 0.55
             &:hover
                 opacity: 1
 
         .file-info
-            padding: 0 0.5em
+            flex: 0 0 auto
+            white-space: nowrap
             font-size: 0.85em
             opacity: 0.65
 
         .status
-            padding: 0 0.5em
+            flex: 0 0 auto
+            white-space: nowrap
             font-size: 0.85em
             opacity: 0.85
 
@@ -264,9 +267,18 @@ $cancel-button-color = tomato
                             margin: 0
                             padding: 0
 
+                    // keeps the whole header on a single line: the flex box
+                    // sits between the floated navs and never overlaps them
+                    .file-line
+                        display: flex
+                        align-items: baseline
+                        gap: 0.4em
+                        overflow: hidden
+
                     span.filename
                         padding: 0 0.5em
-                        display: block
+                        flex: 1 1 auto
+                        min-width: 0
                         overflow: hidden
                         white-space: nowrap
                         text-overflow: ellipsis
