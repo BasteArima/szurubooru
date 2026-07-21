@@ -957,6 +957,12 @@ class PostUploadView extends events.EventTarget {
             return;
         }
         const parts = [];
+        // surfacing the browser-reported type makes it obvious when the OS
+        // handed over a derivative (e.g. a JPEG preview of a video) instead of
+        // the original file
+        if (uploadable.mimeType && uploadable.mimeType !== "unknown") {
+            parts.push(uploadable.mimeType);
+        }
         if (uploadable.size) {
             parts.push(_formatFileSize(uploadable.size));
         }
