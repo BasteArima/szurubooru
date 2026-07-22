@@ -1,3 +1,4 @@
+import szurubooru.api.auto_tag_api
 import szurubooru.api.comment_api
 import szurubooru.api.info_api
 import szurubooru.api.password_reset_api

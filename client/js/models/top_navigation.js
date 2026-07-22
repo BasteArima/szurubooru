@@ -84,6 +84,7 @@ function _makeTopNavigation() {
     ret.add("comments", new TopNavigationItem("C", "Comments", "comments"));
     ret.add("tags", new TopNavigationItem("T", "Tags", "tags"));
     ret.add("pools", new TopNavigationItem("O", "Pools", "pools"));
+    ret.add("auto-tag", new TopNavigationItem("G", "Auto-tag", "auto-tag"));
     ret.add("users", new TopNavigationItem("S", "Users", "users"));
     ret.add("account", new TopNavigationItem("A", "Account", "user/{me}"));
     ret.add("register", new TopNavigationItem("R", "Register", "register"));

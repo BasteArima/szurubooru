@@ -27,6 +27,7 @@ class PostReadonlySidebarControl extends events.EventTarget {
                 enableSafety: api.safetyEnabled(),
                 canListPosts: api.hasPrivilege("posts:list"),
                 canEditPosts: api.hasPrivilege("posts:edit"),
+                canAutoTag: api.hasPrivilege("posts:auto_tag"),
                 canViewTags: api.hasPrivilege("tags:view"),
                 escapeTagName: uri.escapeTagName,
                 extractRootDomain: uri.extractRootDomain,
@@ -38,6 +39,50 @@ class PostReadonlySidebarControl extends events.EventTarget {
         this._installScore();
         this._installFitButtons();
         this._syncFitButton();
+        this._installAutoTag();
+    }
+
+    get _autoTagButtonNode() {
+        return this._hostNode.querySelector(".auto-tag-button");
+    }
+
+    _installAutoTag() {
+        if (this._autoTagButtonNode) {
+            this._autoTagButtonNode.addEventListener("click", (e) =>
+                this._evtAutoTagClick(e)
+            );
+        }
+    }
+
+    _evtAutoTagClick(e) {
+        e.preventDefault();
+        const button = this._autoTagButtonNode;
+        if (button.classList.contains("disabled")) {
+            return;
+        }
+        button.classList.add("disabled");
+        api.post(
+            uri.formatApiLink("post", this._post.id, "auto-tag"),
+            {}
+        ).then(
+            (response) => {
+                let added = 0;
+                const results = response.results || {};
+                for (let key of Object.keys(results)) {
+                    added += results[key].added || 0;
+                }
+                window.alert(
+                    added
+                        ? "Added " + added + " tag(s)."
+                        : "No new tags found."
+                );
+                window.location.reload();
+            },
+            (error) => {
+                button.classList.remove("disabled");
+                window.alert(error.message);
+            }
+        );
     }
 
     get _scoreContainerNode() {

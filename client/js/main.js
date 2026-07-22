@@ -80,6 +80,7 @@ Promise.resolve()
             controllers.push(
                 require("./controllers/pool_categories_controller.js")
             );
+            controllers.push(require("./controllers/auto_tag_controller.js"));
             controllers.push(require("./controllers/settings_controller.js"));
             controllers.push(require("./controllers/user_controller.js"));
             controllers.push(require("./controllers/user_list_controller.js"));

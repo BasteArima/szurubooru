@@ -148,6 +148,14 @@ def create_app() -> Callable[[Any, Any], Any]:
     for migration in _live_migrations:
         threading.Thread(target=migration, daemon=False).start()
 
+    # any auto-tag job left active by a previous process is dead; mark it so
+    from szurubooru.func.auto_tag_jobs import mark_interrupted_jobs
+
+    try:
+        mark_interrupted_jobs()
+    except Exception as ex:
+        logging.exception(ex)
+
     db.session.commit()
 
     rest.errors.handle(errors.AuthError, _on_auth_error)

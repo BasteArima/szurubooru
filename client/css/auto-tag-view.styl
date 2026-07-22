@@ -1,0 +1,80 @@
+@import colors
+
+#auto-tag
+    max-width: 50em
+    margin: 0 auto
+    text-align: left
+
+    h2
+        margin-top: 1em
+
+    fieldset
+        border: 1px solid rgba(127, 127, 127, 0.4)
+        border-radius: 4px
+        margin: 0.8em 0
+        padding: 0.6em 0.9em
+
+        legend
+            padding: 0 0.4em
+            font-weight: bold
+
+        .hint
+            font-weight: normal
+            opacity: 0.6
+            font-size: 0.85em
+
+    label
+        display: block
+        margin: 0.35em 0
+
+        &.inline
+            display: inline-block
+            margin-right: 1.2em
+
+    input[type=text],
+    input[type=password],
+    input[type=number]
+        margin-left: 0.4em
+
+    input[type=text],
+    input[type=password]
+        min-width: 16em
+
+    .category-map
+        margin-top: 0.5em
+        .label
+            display: block
+            opacity: 0.75
+            margin-bottom: 0.2em
+        input
+            min-width: 8em
+
+    .auto-tag-run
+        .row
+            margin: 0.5em 0
+            .label
+                display: inline-block
+                min-width: 6em
+                opacity: 0.75
+
+    .job-status
+        margin-top: 1em
+        padding: 0.7em 0.9em
+        border: 1px solid rgba(127, 127, 127, 0.4)
+        border-radius: 4px
+
+        &:empty
+            display: none
+
+        .info
+            font-weight: bold
+        .counts
+            opacity: 0.8
+            margin-top: 0.2em
+        .msg
+            margin-top: 0.3em
+            color: tomato
+        .controls
+            margin-top: 0.6em
+            button
+                margin-right: 0.5em

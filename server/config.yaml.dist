@@ -171,6 +171,8 @@ privileges:
     'uploads:create':               regular
     'uploads:use_downloader':       power
 
+    'posts:auto_tag':               administrator # run the auto-tagging toolkit (settings + jobs)
+
 ## ONLY SET THESE IF DEPLOYING OUTSIDE OF DOCKER
 #debug: 0 # generate server logs?
 #show_sql: 0 # show sql in server logs?

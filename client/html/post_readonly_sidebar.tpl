@@ -60,6 +60,12 @@
             </section>
         <% } %>
 
+        <% if (ctx.canAutoTag) { %>
+            <section class='auto-tag'>
+                <a href class='auto-tag-button button'><i class='fa fa-tags'></i> Auto-tag this post</a>
+            </section>
+        <% } %>
+
         <section class='search'>
             <strong class='tools-label'>Tools:</strong>
             <a href='http://iqdb.org/?url=<%- encodeURIComponent(ctx.post.fullContentUrl) %>'>IQDB</a>

@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 from szurubooru import db, errors, model, rest, search
 from szurubooru.func import (
     auth,
+    auto_tag,
     favorites,
     mime,
     posts,
@@ -90,6 +91,7 @@ def create_post(
         posts.update_post_thumbnail(post, ctx.get_file("thumbnail"))
     ctx.session.add(post)
     ctx.session.flush()
+    auto_tag.apply_type_tags_on_upload(post)
     create_snapshots_for_post(post, new_tags, None if anonymous else ctx.user)
     alternate_format_posts = posts.generate_alternate_formats(post, content)
     for alternate_post, alternate_post_new_tags in alternate_format_posts:
