@@ -122,7 +122,11 @@ class Api extends events.EventTarget {
             }
         }
         if (minViableRank === null) {
-            throw `Bad privilege name: ${lookup}`;
+            // Unknown privilege — e.g. the client was deployed ahead of the
+            // server (so /info doesn't list it yet), or a config without the
+            // key. Treat it as "not granted" so the feature just stays hidden
+            // instead of throwing and taking down the whole navigation.
+            return false;
         }
         let myRank =
             this.user !== null ? this.allRanks.indexOf(this.user.rank) : 0;
