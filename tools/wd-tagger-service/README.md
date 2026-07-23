@@ -159,21 +159,46 @@ is wired, this service can be exercised directly with `curl`.)
 
 ---
 
-## ComfyUI fallback (same contract)
+## GPU on Blackwell via ComfyUI's Python (recommended if plain pip won't)
 
-If `onnxruntime-gpu` will not drive the 50-series, run the tagger through your
-existing ComfyUI instead — szurubooru only cares that the URL answers the
-contract above.
+If `onnxruntime-gpu` from pip won't drive the 50-series (CUDA-version hell), the
+easiest fix is **not** an adapter — it's to run *this* service with **ComfyUI's
+Python**, which already has an onnxruntime-gpu that works on your card (that's
+why WD tagging works inside ComfyUI). Same service, same contract, just a
+different interpreter.
 
-- Install the **WD14 Tagger** custom node (e.g. `pythongosssss/ComfyUI-WD14-Tagger`)
-  in ComfyUI; it downloads the same SmilingWolf WD v3 models.
-- Build an API workflow: *Load Image → WD14 Tagger → output tags/scores*.
-- Put a thin adapter in front of ComfyUI's `/prompt` API that accepts the
-  `POST /tag` request, runs the workflow, and reshapes ComfyUI's response into
-  the `{model, rating, general, character}` JSON above. Point szurubooru at the
-  adapter's URL.
+1. Make sure WD tagging actually runs on the GPU inside ComfyUI first (the
+   **WD14 Tagger** node, `pythongosssss/ComfyUI-WD14-Tagger`; watch the ComfyUI
+   console / Task Manager GPU during a tag). If ComfyUI itself tags on CPU, this
+   won't help — fix ComfyUI's onnxruntime first.
 
-This keeps szurubooru unchanged; only the thing behind the URL differs.
+2. Find ComfyUI's Python:
+   - portable build: `...\ComfyUI_windows_portable\python_embeded\python.exe`
+   - a venv/conda ComfyUI: that env's `python`.
+
+3. Install this service's non-CUDA deps into that Python **without touching its
+   onnxruntime** (numpy/pillow are already there):
+   ```powershell
+   & "C:\path\to\python_embeded\python.exe" -m pip install fastapi "uvicorn[standard]" huggingface_hub python-multipart
+   ```
+   (Verify it has onnxruntime-gpu: `python_embeded\python.exe -c "import onnxruntime as o; print(o.get_available_providers())"` should list `CUDAExecutionProvider`.)
+
+4. Run this service with that Python:
+   ```powershell
+   set PYTHON=C:\path\to\python_embeded\python.exe
+   run.bat
+   ```
+   `GET /health` should now show `"gpu": true`. szurubooru keeps pointing at the
+   same `http://<pc>:7860/tag` — nothing changes on the szuru side.
+
+### Alternative: a ComfyUI-API adapter (only if the above can't work)
+
+If you must go through ComfyUI's own server instead, put a thin adapter in front
+of ComfyUI's `/prompt` API: it accepts the `POST /tag` request, uploads the
+image (`/upload/image`), queues a *Load Image → WD14 Tagger* workflow
+(`/prompt`), polls `/history/{id}`, then reshapes the node's tag output into the
+`{model, rating, general, character}` JSON (categorise the flat tag list with
+`selected_tags.csv`). More moving parts than reusing ComfyUI's Python above.
 
 ## Security
 
