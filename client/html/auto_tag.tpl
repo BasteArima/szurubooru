@@ -7,8 +7,8 @@
             <fieldset>
                 <legend>Type tags</legend>
                 <div class='checks'>
-                    <label class='inline'><input type='checkbox' data-cfg='typeTags.enabled' data-type='bool' <%- ctx.config.typeTags.enabled ? 'checked' : '' %>/> Enabled</label>
-                    <label class='inline'><input type='checkbox' data-cfg='typeTags.applyOnUpload' data-type='bool' <%- ctx.config.typeTags.applyOnUpload ? 'checked' : '' %>/> Apply on upload</label>
+                    <label class='inline'><input type='checkbox' data-cfg='typeTags.enabled' data-type='bool' <%- ctx.config.typeTags.enabled ? 'checked' : '' %>/><span class='checkbox'>Enabled</span></label>
+                    <label class='inline'><input type='checkbox' data-cfg='typeTags.applyOnUpload' data-type='bool' <%- ctx.config.typeTags.applyOnUpload ? 'checked' : '' %>/><span class='checkbox'>Apply on upload</span></label>
                 </div>
                 <label class='field'><span>animated tag</span><input type='text' data-cfg='typeTags.animatedTag' value='<%- ctx.config.typeTags.animatedTag %>'/></label>
                 <label class='field'><span>video tag</span><input type='text' data-cfg='typeTags.videoTag' value='<%- ctx.config.typeTags.videoTag %>'/></label>
@@ -18,15 +18,16 @@
             <fieldset class='wide'>
                 <legend>Hash lookup</legend>
                 <div class='checks'>
-                    <label class='inline'><input type='checkbox' data-cfg='hash.enabled' data-type='bool' <%- ctx.config.hash.enabled ? 'checked' : '' %>/> Enabled</label>
-                    <label class='inline'><input type='checkbox' data-cfg='hash.applySafety' data-type='bool' <%- ctx.config.hash.applySafety ? 'checked' : '' %>/> Set safety from rating</label>
-                    <label class='inline'><input type='checkbox' data-cfg='hash.safetyOnlyIfUnset' data-type='bool' <%- ctx.config.hash.safetyOnlyIfUnset ? 'checked' : '' %>/> …only when still Safe</label>
+                    <label class='inline'><input type='checkbox' data-cfg='hash.enabled' data-type='bool' <%- ctx.config.hash.enabled ? 'checked' : '' %>/><span class='checkbox'>Enabled</span></label>
+                    <label class='inline'><input type='checkbox' data-cfg='hash.applySafety' data-type='bool' <%- ctx.config.hash.applySafety ? 'checked' : '' %>/><span class='checkbox'>Set safety from rating</span></label>
+                    <label class='inline'><input type='checkbox' data-cfg='hash.safetyOnlyIfUnset' data-type='bool' <%- ctx.config.hash.safetyOnlyIfUnset ? 'checked' : '' %>/><span class='checkbox'>…only when still Safe</span></label>
                 </div>
                 <label class='field'><span>Sources</span><input type='text' data-cfg='hash.sources' data-type='list' value='<%- ctx.config.hash.sources.join(", ") %>'/></label>
                 <label class='field'><span>Request delay, s</span><input type='number' step='0.1' min='0' data-cfg='hash.requestDelaySeconds' data-type='number' value='<%- ctx.config.hash.requestDelaySeconds %>'/></label>
                 <label class='field'><span>User-Agent</span><input type='text' data-cfg='hash.userAgent' value='<%- ctx.config.hash.userAgent %>'/></label>
                 <label class='field'><span>Danbooru login</span><input type='text' data-cfg='hash.danbooruLogin' value='<%- ctx.config.hash.danbooruLogin %>'/></label>
                 <label class='field'><span>Danbooru API key</span><input type='password' autocomplete='off' data-cfg='hash.danbooruApiKey' data-type='secret' placeholder='<%- ctx.config.hash.danbooruApiKey ? "set — leave blank to keep" : "not set" %>'/></label>
+                <p class='sources-hint'>rule34.xxx needs no credentials. Danbooru login+key is optional (higher limits).</p>
                 <div class='category-map'>
                     <span class='sub'>Category mapping (booru → this site)</span>
                     <div class='map-grid'>
@@ -40,7 +41,7 @@
             <fieldset>
                 <legend>AI tagger <span class='hint'>(second delivery — not active yet)</span></legend>
                 <div class='checks'>
-                    <label class='inline'><input type='checkbox' data-cfg='ai.enabled' data-type='bool' <%- ctx.config.ai.enabled ? 'checked' : '' %>/> Enabled</label>
+                    <label class='inline'><input type='checkbox' data-cfg='ai.enabled' data-type='bool' <%- ctx.config.ai.enabled ? 'checked' : '' %>/><span class='checkbox'>Enabled</span></label>
                 </div>
                 <label class='field'><span>Service URL</span><input type='text' data-cfg='ai.url' placeholder='http://192.168.0.XX:7860/tag' value='<%- ctx.config.ai.url %>'/></label>
                 <label class='field'><span>Token</span><input type='password' autocomplete='off' data-cfg='ai.token' data-type='secret' placeholder='<%- ctx.config.ai.token ? "set — leave blank to keep" : "not set" %>'/></label>
@@ -59,21 +60,21 @@
 
         <div class='row'>
             <span class='label'>Methods</span>
-            <label class='inline'><input type='checkbox' name='m-type_tags' checked/> Type tags</label>
-            <label class='inline'><input type='checkbox' name='m-hash' checked/> Hash</label>
-            <label class='inline'><input type='checkbox' name='m-ai'/> AI</label>
+            <label class='inline'><input type='checkbox' name='m-type_tags' checked/><span class='checkbox'>Type tags</span></label>
+            <label class='inline'><input type='checkbox' name='m-hash' checked/><span class='checkbox'>Hash</span></label>
+            <label class='inline'><input type='checkbox' name='m-ai'/><span class='checkbox'>AI</span></label>
         </div>
 
         <div class='row'>
             <span class='label'>Posts</span>
-            <label class='inline'><input type='radio' name='mode' value='new' checked/> New only</label>
-            <label class='inline'><input type='radio' name='mode' value='errors'/> Retry failures</label>
-            <label class='inline'><input type='radio' name='mode' value='all'/> Everything</label>
+            <label class='inline'><input type='radio' name='mode' value='new' checked/><span class='radio'>New only</span></label>
+            <label class='inline'><input type='radio' name='mode' value='errors'/><span class='radio'>Retry failures</span></label>
+            <label class='inline'><input type='radio' name='mode' value='all'/><span class='radio'>Everything</span></label>
         </div>
 
         <div class='row'>
             <span class='label'></span>
-            <label class='inline'><input type='checkbox' name='retryEmpty'/> Re-check hash "not found"</label>
+            <label class='inline'><input type='checkbox' name='retryEmpty'/><span class='checkbox'>Re-check hash "not found"</span></label>
         </div>
 
         <div class='row'>
