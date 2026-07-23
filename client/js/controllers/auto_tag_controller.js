@@ -90,35 +90,14 @@ class AutoTagController {
 
         topNavigation.activate("auto-tag");
         topNavigation.setTitle("Auto-tag");
+        this._pollTimer = null;
 
         Promise.all([
             api.get(uri.formatApiLink("auto-tag", "config")),
             api.get(uri.formatApiLink("auto-tag", "job")),
         ]).then(
             ([configResponse, jobResponse]) => {
-                this._view = new AutoTagView({
-                    config: _mergeDefaults(
-                        CONFIG_DEFAULTS,
-                        configResponse.config
-                    ),
-                    job: jobResponse.job,
-                });
-                this._view.addEventListener("saveSettings", (e) =>
-                    this._evtSaveSettings(e)
-                );
-                this._view.addEventListener("startJob", (e) =>
-                    this._evtStartJob(e)
-                );
-                this._view.addEventListener("pauseJob", () =>
-                    this._control("pause")
-                );
-                this._view.addEventListener("resumeJob", () =>
-                    this._control("resume")
-                );
-                this._view.addEventListener("cancelJob", () =>
-                    this._control("cancel")
-                );
-                this._maybePoll(jobResponse.job);
+                this._installView(configResponse.config, jobResponse.job);
             },
             (error) => {
                 this._view = new EmptyView();
@@ -127,13 +106,42 @@ class AutoTagController {
         );
     }
 
+    _installView(config, job) {
+        this._view = new AutoTagView({
+            config: _mergeDefaults(CONFIG_DEFAULTS, config),
+            job: job,
+        });
+        this._view.addEventListener("saveSettings", (e) =>
+            this._evtSaveSettings(e)
+        );
+        this._view.addEventListener("startJob", (e) => this._evtStartJob(e));
+        this._view.addEventListener("pauseJob", () => this._control("pause"));
+        this._view.addEventListener("resumeJob", () =>
+            this._control("resume")
+        );
+        this._view.addEventListener("cancelJob", () =>
+            this._control("cancel")
+        );
+        this._syncPolling(job);
+    }
+
     _evtSaveSettings(e) {
         api.put(uri.formatApiLink("auto-tag", "config"), {
             config: e.detail.config,
         }).then(
-            () => {
-                this._view.clearMessages();
-                this._view.showSuccess("Settings saved.");
+            (response) => {
+                // re-render from the authoritative saved config, so what you
+                // see afterwards is exactly what was persisted
+                api.get(uri.formatApiLink("auto-tag", "job")).then(
+                    (jobResponse) => {
+                        this._installView(response.config, jobResponse.job);
+                        this._view.showSuccess("Settings saved.");
+                    },
+                    () => {
+                        this._installView(response.config, null);
+                        this._view.showSuccess("Settings saved.");
+                    }
+                );
             },
             (error) => {
                 this._view.clearMessages();
@@ -147,7 +155,7 @@ class AutoTagController {
         api.post(uri.formatApiLink("auto-tag", "job"), e.detail).then(
             (response) => {
                 this._view.updateJob(response.job);
-                this._maybePoll(response.job);
+                this._syncPolling(response.job);
             },
             (error) => this._view.showError(error.message)
         );
@@ -157,34 +165,57 @@ class AutoTagController {
         api.post(uri.formatApiLink("auto-tag", "job", action), {}).then(
             (response) => {
                 this._view.updateJob(response.job);
-                this._maybePoll(response.job);
+                this._syncPolling(response.job);
             },
             (error) => this._view.showError(error.message)
         );
     }
 
-    _maybePoll(job) {
-        if (this._timer) {
-            clearTimeout(this._timer);
-            this._timer = null;
+    _syncPolling(job) {
+        if (job && ACTIVE.includes(job.status)) {
+            this._startPolling();
+        } else {
+            this._stopPolling();
         }
-        if (!job || !ACTIVE.includes(job.status)) {
+    }
+
+    _startPolling() {
+        if (this._pollTimer) {
             return;
         }
-        this._timer = setTimeout(() => this._poll(), 2000);
+        this._pollTimer = setInterval(() => this._poll(), 2000);
+    }
+
+    _stopPolling() {
+        if (this._pollTimer) {
+            clearInterval(this._pollTimer);
+            this._pollTimer = null;
+        }
     }
 
     _poll() {
         // stop once the user has navigated away from the auto-tag page
         if (!document.getElementById("auto-tag")) {
+            this._stopPolling();
             return;
         }
         api.get(uri.formatApiLink("auto-tag", "job")).then(
             (response) => {
-                this._view.updateJob(response.job);
-                this._maybePoll(response.job);
+                try {
+                    this._view.updateJob(response.job);
+                } catch (ex) {
+                    // never let a render error break the polling loop
+                }
+                if (
+                    !response.job ||
+                    !ACTIVE.includes(response.job.status)
+                ) {
+                    this._stopPolling();
+                }
             },
-            () => this._maybePoll({ status: "running" })
+            () => {
+                // keep polling through transient errors
+            }
         );
     }
 }
