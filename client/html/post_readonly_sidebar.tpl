@@ -136,4 +136,11 @@
             </p>
         <% } %>
     </nav>
+
+    <% if (ctx.canAutoTag) { %>
+        <section class='auto-tag-history collapsed'>
+            <h1 class='history-toggle'><i class='fa fa-caret-right'></i>&#32;Auto-tag history</h1>
+            <div class='history-body'></div>
+        </section>
+    <% } %>
 </div>

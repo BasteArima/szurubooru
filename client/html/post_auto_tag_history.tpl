@@ -1,0 +1,20 @@
+<% const labels = { type_tags: 'Type tags', hash: 'Hash', ai: 'AI' }; %><!--
+--><% const ran = ctx.state.filter(e => e.status); %><!--
+--><% if (!ran.length) { %><!--
+    --><p class='no-history'>Never auto-tagged.</p><!--
+--><% } else { %><!--
+    --><ul class='auto-tag-history-list'><!--
+        --><% for (let entry of ctx.state) { %><!--
+            --><li class='status-<%- entry.status || 'none' %>'><!--
+                --><span class='method'><%- labels[entry.method] || entry.method %></span><!--
+                --><% if (entry.status) { %><!--
+                    --><span class='status'><%- entry.status %></span><!--
+                    --><% if (entry.source) { %> &middot; <span class='source'><%- entry.source %></span><% } %><!--
+                    --><% if (entry.addedCount) { %> &middot; +<%- entry.addedCount %><% } %><!--
+                    --><% if (entry.time) { %> &middot; <span class='time'><%= ctx.makeRelativeTime(entry.time) %></span><% } %><!--
+                    --><% if (entry.message) { %><span class='msg'><%- entry.message %></span><% } %><!--
+                --><% } else { %> &middot; <span class='status status-none'>not run</span><% } %><!--
+            --></li><!--
+        --><% } %><!--
+    --></ul><!--
+--><% } %>

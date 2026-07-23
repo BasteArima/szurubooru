@@ -10,6 +10,7 @@ const tags = require("../tags.js");
 const template = views.getTemplate("post-readonly-sidebar");
 const scoreTemplate = views.getTemplate("score");
 const favTemplate = views.getTemplate("fav");
+const autoTagHistoryTemplate = views.getTemplate("post-auto-tag-history");
 
 class PostReadonlySidebarControl extends events.EventTarget {
     constructor(hostNode, post, postContentControl) {
@@ -42,6 +43,41 @@ class PostReadonlySidebarControl extends events.EventTarget {
         this._installFitButtons();
         this._syncFitButton();
         this._installAutoTag();
+        this._installAutoTagHistory();
+    }
+
+    _installAutoTagHistory() {
+        const section = this._hostNode.querySelector(".auto-tag-history");
+        if (!section) {
+            return;
+        }
+        const toggle = section.querySelector(".history-toggle");
+        const body = section.querySelector(".history-body");
+        let loaded = false;
+        toggle.addEventListener("click", (e) => {
+            e.preventDefault();
+            section.classList.toggle("collapsed");
+            if (section.classList.contains("collapsed") || loaded) {
+                return;
+            }
+            loaded = true;
+            api.get(
+                uri.formatApiLink("post", this._post.id, "auto-tag")
+            ).then(
+                (response) => {
+                    views.replaceContent(
+                        body,
+                        autoTagHistoryTemplate({
+                            state: response.autoTagState || [],
+                        })
+                    );
+                },
+                (error) => {
+                    loaded = false;
+                    body.textContent = error.message;
+                }
+            );
+        });
     }
 
     // group the post's tags into per-category blocks, ordered by the tag
