@@ -73,67 +73,77 @@ def _apply_tags(
     recategorize_existing: bool = False,
     neutral_categories: Optional[set] = None,
 ) -> int:
-    """Add missing tags (with szuru category) to the post; returns count added.
+    """Add missing tags to the post and categorise them; returns count added.
 
-    Newly-created tags get their category set. Existing tags keep theirs unless
-    `recategorize_existing` is on, in which case a tag still sitting in a
-    "neutral" category (the default / general bucket) is promoted to its booru
-    category — a manual categorisation (any non-neutral category) is never
-    touched, and a tag is never demoted back into the neutral bucket.
+    A newly-created tag always gets its booru category. A tag that already
+    existed (whether it was already on the post, or exists globally and is just
+    being linked to this post) keeps its category unless `recategorize_existing`
+    is on AND it is still sitting in a "neutral" (uncategorised) category, in
+    which case it is promoted to its booru category. A manual categorisation
+    (any non-neutral category) is never touched.
     """
     neutral = neutral_categories or set()
-    existing_by_name = {}  # type: Dict[str, model.Tag]
-    current = set()
+
+    existing_lower = set()
     for tag in post.tags:
         for tag_name in tag.names:
-            low = tag_name.name.lower()
-            current.add(low)
-            existing_by_name[low] = tag
+            existing_lower.add(tag_name.name.lower())
 
-    to_add = []  # type: List[Tuple[str, str]]
-    seen = set()
+    # normalise + dedupe, remembering the target category for each name
+    category_by_low = {}  # type: Dict[str, str]
+    order = []  # type: List[Tuple[str, str]]
     for name, category in pairs:
         normalized = _normalize(name)
         if not normalized:
             continue
         low = normalized.lower()
-        if low in seen:
+        if low in category_by_low:
             continue
-        seen.add(low)
-        if low in current:
-            if recategorize_existing and category and category not in neutral:
-                tag = existing_by_name.get(low)
-                current_category = (
-                    tag.category.name if tag is not None and tag.category
-                    else None
-                )
-                if (
-                    tag is not None
-                    and current_category in neutral
-                    and current_category != category
-                ):
-                    _set_tag_category(tag, category)
-            continue
-        to_add.append((normalized, category))
+        category_by_low[low] = category
+        order.append((normalized, low))
 
-    if not to_add:
-        return 0
+    to_add = [(name, low) for name, low in order if low not in existing_lower]
 
-    current_names = [
-        name for name in map(_tag_display_name, post.tags) if name
-    ]
-    new_tags = posts.update_post_tags(
-        post, current_names + [name for name, _ in to_add]
-    )
-    category_by_name = {name.lower(): category for name, category in to_add}
-    for tag in new_tags:
-        name = _tag_display_name(tag)
-        if not name:
+    added = 0
+    new_lower = set()
+    if to_add:
+        current_names = [
+            name for name in map(_tag_display_name, post.tags) if name
+        ]
+        new_tags = posts.update_post_tags(
+            post, current_names + [name for name, _ in to_add]
+        )
+        added = len(to_add)
+        new_lower = {
+            (_tag_display_name(tag) or "").lower() for tag in new_tags
+        }
+
+    # single categorisation pass over every requested tag now on the post
+    tag_by_low = {}  # type: Dict[str, model.Tag]
+    for tag in post.tags:
+        for tag_name in tag.names:
+            tag_by_low[tag_name.name.lower()] = tag
+
+    for low, category in category_by_low.items():
+        if not category:
             continue
-        category = category_by_name.get(name.lower())
-        if category:
+        tag = tag_by_low.get(low)
+        if tag is None:
+            continue
+        current_category = tag.category.name if tag.category else None
+        if current_category == category:
+            continue
+        if low in new_lower:
+            # brand-new tag: always assign its booru category
             _set_tag_category(tag, category)
-    return len(to_add)
+        elif (
+            recategorize_existing
+            and category not in neutral
+            and current_category in neutral
+        ):
+            # existing but still uncategorised -> promote (opt-in)
+            _set_tag_category(tag, category)
+    return added
 
 
 def _maybe_apply_safety(
@@ -225,12 +235,10 @@ def apply_hash(
             recategorize = bool(hash_cfg.get("recategorizeExisting"))
             neutral = None
             if recategorize:
-                # categories that count as "not yet categorised": the szuru
-                # default plus whatever booru "general" maps to
-                neutral = {
-                    tag_categories.get_default_category_name(),
-                    category_map.get("general") or "general",
-                }
+                # only the szuru default category counts as "not yet
+                # categorised"; a booru general tag is still promoted into the
+                # (distinct) general category rather than left in default
+                neutral = {tag_categories.get_default_category_name()}
             added = _apply_tags(post, pairs, recategorize, neutral)
             _maybe_apply_safety(post, result.get("safety"), hash_cfg)
             return (model.PostAutoTag.STATUS_DONE, source, added)

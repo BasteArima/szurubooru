@@ -154,6 +154,73 @@ def test_apply_tags_recategorize_off_by_default(
     assert tag.category.name == "default"
 
 
+def test_apply_tags_recategorizes_existing_global_tag_added_to_post(
+    config_injector, post_factory, tag_factory, tag_category_factory
+):
+    # the real-world case: the booru tag already exists globally (uncategorised,
+    # in default) and is being linked to a fresh post - it must be promoted too,
+    # not only tags that were already on the post
+    config_injector({"tag_name_regex": ".*"})
+    default_cat = tag_category_factory(name="default", default=True)
+    copyright_cat = tag_category_factory(name="copyright")
+    db.session.add_all([default_cat, copyright_cat])
+    existing = tag_factory(names=["overwatch"], category=default_cat)
+    db.session.add(existing)
+    post = post_factory(id=1)
+    post.tags = []
+    db.session.add(post)
+    db.session.flush()
+
+    added = auto_tag._apply_tags(
+        post,
+        [("overwatch", "copyright")],
+        recategorize_existing=True,
+        neutral_categories={"default"},
+    )
+    assert added == 1
+    assert existing.category.name == "copyright"
+    assert "overwatch" in {t.names[0].name for t in post.tags}
+
+
+def test_apply_tags_existing_global_tag_untouched_without_recategorize(
+    config_injector, post_factory, tag_factory, tag_category_factory
+):
+    config_injector({"tag_name_regex": ".*"})
+    default_cat = tag_category_factory(name="default", default=True)
+    copyright_cat = tag_category_factory(name="copyright")
+    db.session.add_all([default_cat, copyright_cat])
+    existing = tag_factory(names=["overwatch"], category=default_cat)
+    db.session.add(existing)
+    post = post_factory(id=1)
+    post.tags = []
+    db.session.add(post)
+    db.session.flush()
+
+    auto_tag._apply_tags(post, [("overwatch", "copyright")])
+    assert existing.category.name == "default"
+
+
+def test_apply_tags_new_tag_gets_its_category(
+    config_injector, post_factory, tag_category_factory
+):
+    # a brand-new general tag lands in the (distinct) general category, not left
+    # in default
+    config_injector({"tag_name_regex": ".*"})
+    default_cat = tag_category_factory(name="default", default=True)
+    general_cat = tag_category_factory(name="general")
+    db.session.add_all([default_cat, general_cat])
+    post = post_factory(id=1)
+    post.tags = []
+    db.session.add(post)
+    db.session.flush()
+
+    auto_tag._apply_tags(
+        post, [("1girl", "general")], neutral_categories={"default"}
+    )
+    by_name = {t.names[0].name: t.category.name for t in post.tags}
+    assert by_name.get("1girl") == "general"
+
+
 def test_apply_ai_no_url_is_error(post_factory):
     post = post_factory(id=1)
     status, source, added, message = auto_tag.apply_ai(
