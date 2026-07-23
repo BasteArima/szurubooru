@@ -5,6 +5,7 @@ const events = require("../events.js");
 const views = require("../util/views.js");
 const uri = require("../util/uri.js");
 const misc = require("../util/misc.js");
+const tags = require("../tags.js");
 
 const template = views.getTemplate("post-readonly-sidebar");
 const scoreTemplate = views.getTemplate("score");
@@ -24,6 +25,7 @@ class PostReadonlySidebarControl extends events.EventTarget {
             this._hostNode,
             template({
                 post: this._post,
+                tagGroups: this._getTagGroups(),
                 enableSafety: api.safetyEnabled(),
                 canListPosts: api.hasPrivilege("posts:list"),
                 canEditPosts: api.hasPrivilege("posts:edit"),
@@ -40,6 +42,43 @@ class PostReadonlySidebarControl extends events.EventTarget {
         this._installFitButtons();
         this._syncFitButton();
         this._installAutoTag();
+    }
+
+    // group the post's tags into per-category blocks, ordered by the tag
+    // category `order` (Danbooru-style), tags sorted within each block
+    _getTagGroups() {
+        const order = tags.getCategoryOrder();
+        const orderIndex = {};
+        order.forEach((name, index) => {
+            orderIndex[name] = index;
+        });
+        const rank = (category) =>
+            category in orderIndex ? orderIndex[category] : order.length;
+
+        const groups = new Map();
+        for (let tag of this._post.tags) {
+            if (!groups.has(tag.category)) {
+                groups.set(tag.category, []);
+            }
+            groups.get(tag.category).push(tag);
+        }
+
+        return Array.from(groups.entries())
+            .map(([category, groupTags]) => ({
+                category: category,
+                tags: groupTags
+                    .slice()
+                    .sort((a, b) =>
+                        misc
+                            .getPrettyName(a.names[0])
+                            .localeCompare(misc.getPrettyName(b.names[0]))
+                    ),
+            }))
+            .sort(
+                (a, b) =>
+                    rank(a.category) - rank(b.category) ||
+                    a.category.localeCompare(b.category)
+            );
     }
 
     get _autoTagButtonNode() {
