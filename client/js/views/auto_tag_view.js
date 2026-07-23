@@ -18,6 +18,17 @@ function _setPath(obj, dotted, value) {
     node[parts[parts.length - 1]] = value;
 }
 
+function _getPath(obj, dotted) {
+    let node = obj;
+    for (let part of dotted.split(".")) {
+        if (node === null || typeof node !== "object") {
+            return undefined;
+        }
+        node = node[part];
+    }
+    return node;
+}
+
 class AutoTagView extends events.EventTarget {
     constructor(ctx) {
         super();
@@ -29,6 +40,10 @@ class AutoTagView extends events.EventTarget {
                 serverVersion: ctx.serverVersion,
             })
         );
+        // szurubooru's template engine does not substitute a `<%- %>` in
+        // attribute-name position, so bool checkboxes can't render their
+        // `checked` state from the template - apply it from the config here.
+        this._syncCheckboxes(ctx.config);
         views.syncScrollPosition();
 
         this._settingsFormNode.addEventListener("submit", (e) => {
@@ -47,6 +62,14 @@ class AutoTagView extends events.EventTarget {
         });
 
         this.updateJob(ctx.job);
+    }
+
+    _syncCheckboxes(config) {
+        for (let node of this._settingsFormNode.querySelectorAll(
+            "[data-cfg][data-type=bool]"
+        )) {
+            node.checked = !!_getPath(config, node.dataset.cfg);
+        }
     }
 
     get _settingsFormNode() {
