@@ -27,7 +27,7 @@ class PostReadonlySidebarControl extends events.EventTarget {
                 enableSafety: api.safetyEnabled(),
                 canListPosts: api.hasPrivilege("posts:list"),
                 canEditPosts: api.hasPrivilege("posts:edit"),
-                canAutoTag: api.hasPrivilege("posts:auto_tag"),
+                canAutoTag: api.hasPrivilege("posts:autoTag"),
                 canViewTags: api.hasPrivilege("tags:view"),
                 escapeTagName: uri.escapeTagName,
                 extractRootDomain: uri.extractRootDomain,

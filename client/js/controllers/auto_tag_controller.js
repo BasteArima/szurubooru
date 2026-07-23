@@ -10,7 +10,7 @@ const ACTIVE = ["running", "paused", "cancelling"];
 
 class AutoTagController {
     constructor() {
-        if (!api.hasPrivilege("posts:auto_tag")) {
+        if (!api.hasPrivilege("posts:autoTag")) {
             this._view = new EmptyView();
             this._view.showError("You don't have privileges to auto-tag.");
             return;

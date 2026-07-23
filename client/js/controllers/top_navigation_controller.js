@@ -53,7 +53,7 @@ class TopNavigationController {
         if (!api.hasPrivilege("pools:list")) {
             topNavigation.hide("pools");
         }
-        if (!api.hasPrivilege("posts:auto_tag")) {
+        if (!api.hasPrivilege("posts:autoTag")) {
             topNavigation.hide("auto-tag");
         }
         if (api.isLoggedIn()) {
