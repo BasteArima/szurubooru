@@ -60,12 +60,6 @@
             </section>
         <% } %>
 
-        <% if (ctx.canAutoTag) { %>
-            <section class='auto-tag'>
-                <a href class='auto-tag-button button'><i class='fa fa-tags'></i> Auto-tag this post</a>
-            </section>
-        <% } %>
-
         <section class='search'>
             <strong class='tools-label'>Tools:</strong>
             <a href='http://iqdb.org/?url=<%- encodeURIComponent(ctx.post.fullContentUrl) %>'>IQDB</a>
@@ -75,6 +69,12 @@
             <a href='https://yandex.com/images/search?rpt=imageview&url=<%- encodeURIComponent(ctx.post.fullContentUrl) %>'>Yandex</a>
             <a href='https://unlimited.waifu2x.net/'>Waifu2x</a>
         </section>
+
+        <% if (ctx.canAutoTag) { %>
+            <section class='auto-tag'>
+                <a href class='auto-tag-button button'><i class='fa fa-tags'></i> Auto-tag this post</a>
+            </section>
+        <% } %>
 
         <section class='social'>
             <div class='score-container'></div>
@@ -139,7 +139,7 @@
 
     <% if (ctx.canAutoTag) { %>
         <section class='auto-tag-history collapsed'>
-            <h1 class='history-toggle'><i class='fa fa-caret-right'></i>&#32;Auto-tag history</h1>
+            <h3 class='history-toggle'><i class='fa fa-caret-right'></i>&#32;Auto-tag history</h3>
             <div class='history-body'></div>
         </section>
     <% } %>
