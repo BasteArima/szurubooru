@@ -192,29 +192,42 @@ def _gelbooru_tag_categories(
     return result
 
 
+def _source_cfg(cfg: Dict, source: str) -> Dict:
+    sources = cfg.get("sources") or {}
+    value = sources.get(source)
+    return value if isinstance(value, dict) else {}
+
+
+def _auth_extra(source_cfg: Dict) -> str:
+    """Gelbooru-style &api_key=&user_id= auth, only when both are set."""
+    api_key = source_cfg.get("apiKey") or ""
+    user_id = source_cfg.get("userId") or ""
+    if api_key and user_id:
+        return "&api_key=%s&user_id=%s" % (
+            urllib.parse.quote(api_key),
+            urllib.parse.quote(str(user_id)),
+        )
+    return ""
+
+
 def _lookup_rule34(md5: str, cfg: Dict) -> Optional[Dict]:
+    extra = _auth_extra(_source_cfg(cfg, "rule34"))
     return _gelbooru_style(
-        "https://api.rule34.xxx/index.php", md5, cfg, "rule34"
+        "https://api.rule34.xxx/index.php", md5, cfg, "rule34", extra
     )
 
 
 def _lookup_gelbooru(md5: str, cfg: Dict) -> Optional[Dict]:
-    extra = ""
-    api_key = cfg.get("gelbooruApiKey") or ""
-    user_id = cfg.get("gelbooruUserId") or ""
-    if api_key and user_id:
-        extra = "&api_key=%s&user_id=%s" % (
-            urllib.parse.quote(api_key),
-            urllib.parse.quote(str(user_id)),
-        )
+    extra = _auth_extra(_source_cfg(cfg, "gelbooru"))
     return _gelbooru_style(
         "https://gelbooru.com/index.php", md5, cfg, "gelbooru", extra
     )
 
 
 def _lookup_danbooru(md5: str, cfg: Dict) -> Optional[Dict]:
-    login = cfg.get("danbooruLogin") or ""
-    api_key = cfg.get("danbooruApiKey") or ""
+    src = _source_cfg(cfg, "danbooru")
+    login = src.get("login") or ""
+    api_key = src.get("apiKey") or ""
     auth = ""
     if login and api_key:
         auth = "&login=%s&api_key=%s" % (

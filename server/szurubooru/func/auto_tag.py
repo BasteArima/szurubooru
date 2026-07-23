@@ -137,8 +137,18 @@ def apply_hash(
     if not md5:
         return (model.PostAutoTag.STATUS_EMPTY, None, 0)
 
+    sources_cfg = hash_cfg.get("sources", {})
+    ordered_sources = sorted(
+        (
+            name
+            for name, opts in sources_cfg.items()
+            if isinstance(opts, dict) and opts.get("enabled")
+        ),
+        key=lambda name: sources_cfg[name].get("priority", 99),
+    )
+
     had_retryable = False
-    for source in hash_cfg.get("sources", []):
+    for source in ordered_sources:
         try:
             result = booru.lookup(source, md5, hash_cfg)
         except booru.BooruRetryError as ex:

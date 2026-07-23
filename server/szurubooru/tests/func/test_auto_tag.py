@@ -23,9 +23,29 @@ def test_defaults_have_expected_shape():
     d = auto_tag_config.DEFAULTS
     assert d["typeTags"]["animatedTag"] == "animated"
     assert d["typeTags"]["videoTag"] == "video"
-    assert "rule34" in d["hash"]["sources"]
+    assert set(d["hash"]["sources"].keys()) == {
+        "rule34",
+        "danbooru",
+        "gelbooru",
+    }
     for secret in auto_tag_config.SECRET_FIELDS:
         assert auto_tag_config._path_get(d, secret) == ""
+
+
+def test_normalize_migrates_legacy_shape():
+    cfg = {
+        "hash": {
+            "sources": ["rule34", "danbooru"],  # old list format
+            "danbooruApiKey": "legacy-key",  # old top-level secret
+        }
+    }
+    out = auto_tag_config._normalize(cfg)
+    sources = out["hash"]["sources"]
+    assert isinstance(sources, dict)
+    assert set(sources.keys()) == {"rule34", "danbooru", "gelbooru"}
+    assert sources["rule34"]["priority"] == 1
+    assert sources["danbooru"]["apiKey"] == "legacy-key"
+    assert "danbooruApiKey" not in out["hash"]
 
 
 def test_norm_safety_mapping():

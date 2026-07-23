@@ -22,12 +22,34 @@
                     <label class='inline'><input type='checkbox' data-cfg='hash.applySafety' data-type='bool' <%- ctx.config.hash.applySafety ? 'checked' : '' %>/><span class='checkbox'>Set safety from rating</span></label>
                     <label class='inline'><input type='checkbox' data-cfg='hash.safetyOnlyIfUnset' data-type='bool' <%- ctx.config.hash.safetyOnlyIfUnset ? 'checked' : '' %>/><span class='checkbox'>…only when still Safe</span></label>
                 </div>
-                <label class='field'><span>Sources</span><input type='text' data-cfg='hash.sources' data-type='list' value='<%- ctx.config.hash.sources.join(", ") %>'/></label>
                 <label class='field'><span>Request delay, s</span><input type='number' step='0.1' min='0' data-cfg='hash.requestDelaySeconds' data-type='number' value='<%- ctx.config.hash.requestDelaySeconds %>'/></label>
                 <label class='field'><span>User-Agent</span><input type='text' data-cfg='hash.userAgent' value='<%- ctx.config.hash.userAgent %>'/></label>
-                <label class='field'><span>Danbooru login</span><input type='text' data-cfg='hash.danbooruLogin' value='<%- ctx.config.hash.danbooruLogin %>'/></label>
-                <label class='field'><span>Danbooru API key</span><input type='password' autocomplete='off' data-cfg='hash.danbooruApiKey' data-type='secret' placeholder='<%- ctx.config.hash.danbooruApiKey ? "set — leave blank to keep" : "not set" %>'/></label>
-                <p class='sources-hint'>rule34.xxx needs no credentials. Danbooru login+key is optional (higher limits).</p>
+
+                <div class='sources'>
+                    <span class='sub'>Sources — checked = used, queried in priority order, stops at the first hit</span>
+                    <div class='source-cards'>
+                        <div class='source'>
+                            <label class='inline'><input type='checkbox' data-cfg='hash.sources.rule34.enabled' data-type='bool' <%- ctx.config.hash.sources.rule34.enabled ? 'checked' : '' %>/><span class='checkbox'>rule34.xxx</span></label>
+                            <label class='field small'><span>priority</span><input type='number' min='1' step='1' data-cfg='hash.sources.rule34.priority' data-type='number' value='<%- ctx.config.hash.sources.rule34.priority %>'/></label>
+                            <label class='field small'><span>user id</span><input type='text' data-cfg='hash.sources.rule34.userId' value='<%- ctx.config.hash.sources.rule34.userId %>'/></label>
+                            <label class='field small'><span>API key</span><input type='password' autocomplete='off' data-cfg='hash.sources.rule34.apiKey' data-type='secret' placeholder='<%- ctx.config.hash.sources.rule34.apiKey ? "set" : "not set" %>'/></label>
+                        </div>
+                        <div class='source'>
+                            <label class='inline'><input type='checkbox' data-cfg='hash.sources.danbooru.enabled' data-type='bool' <%- ctx.config.hash.sources.danbooru.enabled ? 'checked' : '' %>/><span class='checkbox'>danbooru.donmai.us</span></label>
+                            <label class='field small'><span>priority</span><input type='number' min='1' step='1' data-cfg='hash.sources.danbooru.priority' data-type='number' value='<%- ctx.config.hash.sources.danbooru.priority %>'/></label>
+                            <label class='field small'><span>login</span><input type='text' data-cfg='hash.sources.danbooru.login' value='<%- ctx.config.hash.sources.danbooru.login %>'/></label>
+                            <label class='field small'><span>API key</span><input type='password' autocomplete='off' data-cfg='hash.sources.danbooru.apiKey' data-type='secret' placeholder='<%- ctx.config.hash.sources.danbooru.apiKey ? "set" : "not set" %>'/></label>
+                        </div>
+                        <div class='source'>
+                            <label class='inline'><input type='checkbox' data-cfg='hash.sources.gelbooru.enabled' data-type='bool' <%- ctx.config.hash.sources.gelbooru.enabled ? 'checked' : '' %>/><span class='checkbox'>gelbooru.com</span></label>
+                            <label class='field small'><span>priority</span><input type='number' min='1' step='1' data-cfg='hash.sources.gelbooru.priority' data-type='number' value='<%- ctx.config.hash.sources.gelbooru.priority %>'/></label>
+                            <label class='field small'><span>user id</span><input type='text' data-cfg='hash.sources.gelbooru.userId' value='<%- ctx.config.hash.sources.gelbooru.userId %>'/></label>
+                            <label class='field small'><span>API key</span><input type='password' autocomplete='off' data-cfg='hash.sources.gelbooru.apiKey' data-type='secret' placeholder='<%- ctx.config.hash.sources.gelbooru.apiKey ? "set" : "not set" %>'/></label>
+                        </div>
+                    </div>
+                    <p class='sources-hint'>rule34.xxx &amp; gelbooru.com need api_key + user_id (Account → Options → API Access Credentials). Danbooru login + key is optional (higher limits).</p>
+                </div>
+
                 <div class='category-map'>
                     <span class='sub'>Category mapping (booru → this site)</span>
                     <div class='map-grid'>
