@@ -11,9 +11,12 @@ from typing import Dict, List, Optional, Tuple
 
 from szurubooru import config, db, model
 from szurubooru.func import (
+    ai_tagger,
     auto_tag_config,
     booru,
     booru_cache,
+    files,
+    mime,
     posts,
     tag_categories,
     tags,
@@ -237,6 +240,93 @@ def apply_hash(
     return (model.PostAutoTag.STATUS_EMPTY, None, 0)
 
 
+def _resize_for_tagger(raw: bytes, max_side: int = 512) -> Tuple[bytes, str]:
+    """Shrink an image so the LAN transfer is small; the tagger re-resizes to
+    its own input size anyway. Returns (bytes, mime); falls back to the
+    original on any failure."""
+    try:
+        import io
+
+        from PIL import Image
+
+        image = Image.open(io.BytesIO(raw))
+        image.load()
+        width, height = image.size
+        if max(width, height) <= max_side:
+            return (raw, "")
+        scale = max_side / float(max(width, height))
+        image = image.convert("RGB").resize(
+            (max(1, int(width * scale)), max(1, int(height * scale))),
+            Image.BICUBIC,
+        )
+        out = io.BytesIO()
+        image.save(out, format="JPEG", quality=90)
+        return (out.getvalue(), "image/jpeg")
+    except Exception as ex:  # noqa: BLE001 - resizing is best-effort
+        logger.warning("auto-tag ai resize failed: %s", ex)
+        return (raw, "")
+
+
+def apply_ai(
+    post: model.Post, cfg: Dict
+) -> Tuple[str, Optional[str], int, Optional[str]]:
+    ai_cfg = cfg["ai"]
+    url = (ai_cfg.get("url") or "").strip()
+    if not url:
+        return (
+            model.PostAutoTag.STATUS_ERROR,
+            None,
+            0,
+            "AI tagger URL not set",
+        )
+
+    # images send their content; video/flash send the generated thumbnail
+    if mime.is_image(post.mime_type):
+        raw = files.get(posts.get_post_content_path(post))
+        mime_type = post.mime_type
+    else:
+        raw = files.get(posts.get_post_thumbnail_path(post))
+        mime_type = "image/jpeg"
+    if not raw:
+        return (
+            model.PostAutoTag.STATUS_ERROR,
+            None,
+            0,
+            "post content unavailable",
+        )
+
+    if ai_cfg.get("resize"):
+        raw, resized_mime = _resize_for_tagger(raw)
+        if resized_mime:
+            mime_type = resized_mime
+
+    general_threshold = float(ai_cfg.get("generalThreshold") or 0.35)
+    character_threshold = float(ai_cfg.get("characterThreshold") or 0.75)
+    try:
+        result = ai_tagger.tag(
+            url,
+            raw,
+            ai_cfg.get("token") or "",
+            general_threshold,
+            character_threshold,
+            mime_type,
+        )
+    except ai_tagger.TaggerError as ex:
+        return (model.PostAutoTag.STATUS_ERROR, None, 0, str(ex))
+
+    category_map = cfg["hash"].get("categoryMap", {})
+    general_category = category_map.get("general") or "general"
+    character_category = category_map.get("character") or "character"
+    pairs = []  # type: List[Tuple[str, str]]
+    for name in result.get("general") or {}:
+        pairs.append((name, general_category))
+    for name in result.get("character") or {}:
+        pairs.append((name, character_category))
+
+    added = _apply_tags(post, pairs)
+    return (model.PostAutoTag.STATUS_DONE, result.get("model"), added, None)
+
+
 def _record(
     post_id: int,
     method: str,
@@ -317,12 +407,7 @@ def run_methods_on_post(
             elif method == model.PostAutoTag.METHOD_HASH:
                 status, source, added = apply_hash(post, cfg, category_cache)
             elif method == model.PostAutoTag.METHOD_AI:
-                # Delivery B: AI tagger microservice not wired yet
-                status, added = (
-                    model.PostAutoTag.STATUS_ERROR,
-                    0,
-                )
-                message = "AI tagger not implemented yet"
+                status, source, added, message = apply_ai(post, cfg)
             else:
                 continue
         except Exception as ex:  # noqa: BLE001 - record and keep going

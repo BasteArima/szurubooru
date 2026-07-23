@@ -1,5 +1,12 @@
 from szurubooru import db
-from szurubooru.func import auto_tag, auto_tag_config, booru
+from szurubooru.func import (
+    ai_tagger,
+    auto_tag,
+    auto_tag_config,
+    booru,
+    files,
+    posts,
+)
 
 
 def test_deep_merge_overrides_and_preserves():
@@ -145,6 +152,100 @@ def test_apply_tags_recategorize_off_by_default(
     )
     auto_tag._apply_tags(post, [("rwt4184", "artist")])
     assert tag.category.name == "default"
+
+
+def test_apply_ai_no_url_is_error(post_factory):
+    post = post_factory(id=1)
+    status, source, added, message = auto_tag.apply_ai(
+        post, {"ai": {"url": ""}, "hash": {"categoryMap": {}}}
+    )
+    assert status == "error"
+    assert added == 0
+    assert "URL" in message
+
+
+def test_apply_ai_applies_general_and_character_categories(
+    config_injector, post_factory, tag_category_factory
+):
+    config_injector({"tag_name_regex": ".*"})
+    default_cat = tag_category_factory(name="default", default=True)
+    general_cat = tag_category_factory(name="general")
+    character_cat = tag_category_factory(name="character")
+    db.session.add_all([default_cat, general_cat, character_cat])
+    post = post_factory(id=1)
+    post.mime_type = "image/jpeg"
+    post.tags = []
+    db.session.add(post)
+    db.session.flush()
+
+    originals = (ai_tagger.tag, files.get, posts.get_post_content_path)
+    ai_tagger.tag = lambda *a, **k: {
+        "model": "wd-test",
+        "rating": {},
+        "general": {"1girl": 0.9},
+        "character": {"hatsune_miku": 0.9},
+    }
+    files.get = lambda path: b"fakeimage"
+    posts.get_post_content_path = lambda p: "posts/x.jpg"
+    try:
+        status, source, added, message = auto_tag.apply_ai(
+            post,
+            {
+                "ai": {
+                    "url": "http://tagger/tag",
+                    "token": "",
+                    "generalThreshold": 0.35,
+                    "characterThreshold": 0.75,
+                    "resize": False,
+                },
+                "hash": {
+                    "categoryMap": {
+                        "general": "general",
+                        "character": "character",
+                    }
+                },
+            },
+        )
+    finally:
+        ai_tagger.tag, files.get, posts.get_post_content_path = originals
+
+    assert status == "done"
+    assert source == "wd-test"
+    assert added == 2
+    by_name = {t.names[0].name: t.category.name for t in post.tags}
+    assert by_name.get("1girl") == "general"
+    assert by_name.get("hatsune_miku") == "character"
+
+
+def test_apply_ai_tagger_error_is_retryable(
+    config_injector, post_factory, tag_category_factory
+):
+    config_injector({"tag_name_regex": ".*"})
+    db.session.add(tag_category_factory(name="default", default=True))
+    post = post_factory(id=1)
+    post.mime_type = "image/jpeg"
+    post.tags = []
+    db.session.add(post)
+    db.session.flush()
+
+    originals = (ai_tagger.tag, files.get, posts.get_post_content_path)
+
+    def _boom(*a, **k):
+        raise ai_tagger.TaggerError("tagger unreachable: refused")
+
+    ai_tagger.tag = _boom
+    files.get = lambda path: b"fakeimage"
+    posts.get_post_content_path = lambda p: "posts/x.jpg"
+    try:
+        status, source, added, message = auto_tag.apply_ai(
+            post, {"ai": {"url": "http://x/tag"}, "hash": {"categoryMap": {}}}
+        )
+    finally:
+        ai_tagger.tag, files.get, posts.get_post_content_path = originals
+
+    assert status == "error"
+    assert added == 0
+    assert "unreachable" in message
 
 
 def test_tag_display_name_uses_names_when_first_name_none():
