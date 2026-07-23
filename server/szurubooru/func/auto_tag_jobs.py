@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from szurubooru import db, errors, model
-from szurubooru.func import auto_tag, auto_tag_config
+from szurubooru.func import auto_tag, auto_tag_config, booru_cache
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +147,8 @@ def _run_job(
         ids = _candidate_post_ids(query)
         _update_progress(job_id, total=len(ids))
 
+        # one cache for the whole job: each unique booru tag is resolved once
+        category_cache = booru_cache.TagCategoryCache()
         processed = tagged = failed = errors = 0
         for post_id in ids:
             control = _read_status(job_id)
@@ -174,7 +176,7 @@ def _run_job(
                 )
                 if run_methods:
                     results = auto_tag.run_methods_on_post(
-                        post, run_methods, cfg
+                        post, run_methods, cfg, category_cache
                     )
                     if any(r["added"] for r in results.values()):
                         tagged += 1

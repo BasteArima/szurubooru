@@ -1,5 +1,10 @@
 import szurubooru.model.util
-from szurubooru.model.auto_tag import AutoTagConfig, AutoTagJob, PostAutoTag
+from szurubooru.model.auto_tag import (
+    AutoTagConfig,
+    AutoTagJob,
+    BooruTagCategory,
+    PostAutoTag,
+)
 from szurubooru.model.base import Base
 from szurubooru.model.comment import Comment, CommentScore
 from szurubooru.model.pool import Pool, PoolName, PoolPost

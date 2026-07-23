@@ -44,6 +44,23 @@ class PostAutoTag(Base):
     attempt_time = sa.Column("attempt_time", sa.DateTime, nullable=False)
 
 
+class BooruTagCategory(Base):
+    __tablename__ = "booru_tag_category"
+
+    # persistent cache of a booru tag's canonical category, so a bulk hash
+    # import resolves each unique tag against the booru at most once ever
+    # (rule34 has no batch tag lookup, making this the difference between a
+    # feasible and an unfeasible backfill). Keyed by (source, tag name).
+    source = sa.Column(
+        "source", sa.Unicode(32), primary_key=True, nullable=False
+    )
+    name = sa.Column(
+        "name", sa.Unicode(255), primary_key=True, nullable=False
+    )
+    category = sa.Column("category", sa.Unicode(32), nullable=False)
+    updated_time = sa.Column("updated_time", sa.DateTime, nullable=True)
+
+
 class AutoTagJob(Base):
     __tablename__ = "auto_tag_job"
 

@@ -10,7 +10,14 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from szurubooru import config, db, model
-from szurubooru.func import auto_tag_config, booru, posts, tags, versions
+from szurubooru.func import (
+    auto_tag_config,
+    booru,
+    booru_cache,
+    posts,
+    tags,
+    versions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +135,7 @@ def apply_type_tags_on_upload(post: model.Post) -> None:
 
 
 def apply_hash(
-    post: model.Post, cfg: Dict
+    post: model.Post, cfg: Dict, category_cache=None
 ) -> Tuple[str, Optional[str], int]:
     hash_cfg = cfg["hash"]
     if not hash_cfg.get("enabled"):
@@ -150,7 +157,7 @@ def apply_hash(
     had_retryable = False
     for source in ordered_sources:
         try:
-            result = booru.lookup(source, md5, hash_cfg)
+            result = booru.lookup(source, md5, hash_cfg, category_cache)
         except booru.BooruRetryError as ex:
             had_retryable = True
             logger.warning("auto-tag hash %s: %s", source, ex)
@@ -229,10 +236,17 @@ def should_run_methods(
 
 
 def run_methods_on_post(
-    post: model.Post, methods: List[str], cfg: Dict
+    post: model.Post, methods: List[str], cfg: Dict, category_cache=None
 ) -> Dict[str, Dict]:
     """Run the given methods on a post, record state, commit. Returns a summary
-    per method: {method: {status, added, message}}."""
+    per method: {method: {status, added, message}}.
+
+    `category_cache` is reused across posts by the job runner so a backfill
+    resolves each unique booru tag once; a fresh DB-backed cache is created
+    when omitted (single-post runs still benefit from a job's cached tags).
+    """
+    if category_cache is None:
+        category_cache = booru_cache.TagCategoryCache()
     results = {}  # type: Dict[str, Dict]
     changed = False
     for method in methods:
@@ -244,7 +258,7 @@ def run_methods_on_post(
             if method == model.PostAutoTag.METHOD_TYPE_TAGS:
                 status, added = apply_type_tags(post, cfg)
             elif method == model.PostAutoTag.METHOD_HASH:
-                status, source, added = apply_hash(post, cfg)
+                status, source, added = apply_hash(post, cfg, category_cache)
             elif method == model.PostAutoTag.METHOD_AI:
                 # Delivery B: AI tagger microservice not wired yet
                 status, added = (

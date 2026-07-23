@@ -75,3 +75,110 @@ def test_gelbooru_type_map():
     assert booru._GELBOORU_TYPE[3] == "copyright"
     assert booru._GELBOORU_TYPE[4] == "character"
     assert booru._GELBOORU_TYPE[5] == "meta"
+
+
+def test_parse_tag_types_rule34_xml():
+    # rule34.xxx returns XML even with json=1
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?><tags type="array">'
+        '<tag type="0" count="1" name="1girl" id="1"/>'
+        '<tag type="4" count="1" name="firefly_(honkai:_star_rail)" id="2"/>'
+        '<tag type="3" count="1" name="honkai:_star_rail" id="3"/>'
+        "</tags>"
+    )
+    assert booru._parse_tag_types(xml.encode()) == {
+        "1girl": "general",
+        "firefly_(honkai:_star_rail)": "character",
+        "honkai:_star_rail": "copyright",
+    }
+
+
+def test_parse_tag_types_json_shapes():
+    # gelbooru.com returns JSON: a bare list or wrapped in {"tag": [...]}
+    as_list = b'[{"type":1,"name":"artist_x"},{"type":5,"name":"highres"}]'
+    assert booru._parse_tag_types(as_list) == {
+        "artist_x": "artist",
+        "highres": "meta",
+    }
+    wrapped = b'{"tag":[{"type":4,"name":"char_y"}]}'
+    assert booru._parse_tag_types(wrapped) == {"char_y": "character"}
+
+
+def test_parse_tag_types_garbage_and_empty():
+    # auth errors / empty bodies must not raise, just yield nothing
+    assert booru._parse_tag_types(b"") == {}
+    assert booru._parse_tag_types(b"Missing authentication.") == {}
+    assert booru._parse_tag_types(b"<not-valid-xml") == {}
+    # unknown numeric type falls back to general
+    assert booru._parse_tag_types(b'[{"type":99,"name":"t"}]') == {
+        "t": "general"
+    }
+
+
+def test_tag_batch_support_flags():
+    # rule34 has no batch tag endpoint (per-tag XML); gelbooru.com does
+    assert booru._TAG_BATCH_SUPPORT.get("rule34") is False
+    assert booru._TAG_BATCH_SUPPORT.get("gelbooru") is True
+    # unknown source defaults to per-tag (safe)
+    assert booru._TAG_BATCH_SUPPORT.get("whatever", False) is False
+
+
+def test_tag_category_cache_skips_network_on_hit():
+    class FakeCache:
+        def __init__(self):
+            self.data = {}
+
+        def get(self, source, names):
+            return {
+                n: self.data[(source, n)]
+                for n in names
+                if (source, n) in self.data
+            }
+
+        def put(self, source, mapping):
+            for n, c in mapping.items():
+                self.data[(source, n)] = c
+
+    calls = {"n": 0}
+
+    def fake_fetch(url, ua, source, delay):
+        calls["n"] += 1
+        import urllib.parse
+
+        params = dict(urllib.parse.parse_qsl(url.split("?", 1)[1]))
+        name = params.get("name", "")
+        types = {"1girl": "0", "firefly": "4"}
+        if name in types:
+            return (
+                '<tags><tag type="%s" name="%s"/></tags>'
+                % (types[name], name)
+            ).encode()
+        return b"<tags></tags>"
+
+    original = booru._fetch
+    booru._fetch = fake_fetch
+    try:
+        cfg = {"userAgent": "x", "requestDelaySeconds": 0}
+        cache = FakeCache()
+        first = booru._gelbooru_tag_categories(
+            "http://r", ["1girl", "firefly"], cfg, "rule34", "", cache
+        )
+        assert first == {"1girl": "general", "firefly": "character"}
+        assert calls["n"] == 2
+        # second pass is served entirely from the cache
+        calls["n"] = 0
+        second = booru._gelbooru_tag_categories(
+            "http://r", ["1girl", "firefly"], cfg, "rule34", "", cache
+        )
+        assert second == first
+        assert calls["n"] == 0
+        # an unresolved tag stays out of the cache so it can be retried later
+        calls["n"] = 0
+        third = booru._gelbooru_tag_categories(
+            "http://r", ["1girl", "unknown"], cfg, "rule34", "", cache
+        )
+        assert third == {"1girl": "general", "unknown": "general"}
+        assert calls["n"] == 1
+        assert ("rule34", "unknown") not in cache.data
+    finally:
+        booru._fetch = original

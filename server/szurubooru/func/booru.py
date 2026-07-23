@@ -13,6 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,43 @@ _GELBOORU_TYPE = {
     4: "character",
     5: "meta",
 }
+
+# Which sources' tag endpoint supports the plural `names=` batch lookup.
+# rule34.xxx is a Gelbooru 0.2 fork: its tag endpoint returns XML (never JSON,
+# even with json=1) and only honours the singular `name=` param, so categories
+# must be resolved one tag at a time. gelbooru.com supports the batched lookup.
+# Unknown sources default to per-tag (the safe, always-correct path).
+_TAG_BATCH_SUPPORT = {
+    "rule34": False,
+    "gelbooru": True,
+}
+
+
+class _InProcessTagCategoryCache:
+    """Default cache used when no persistent cache is injected (single-source
+    of the .get/.put interface booru.py relies on). Kept for the life of the
+    process, so it still avoids re-querying a tag within one run; the DB-backed
+    cache in booru_cache.TagCategoryCache adds cross-run persistence."""
+
+    def __init__(self) -> None:
+        self._data = {}  # type: Dict[Tuple[str, str], str]
+        self._lock = threading.Lock()
+
+    def get(self, source: str, names) -> Dict[str, str]:
+        with self._lock:
+            return {
+                name: self._data[(source, name)]
+                for name in names
+                if (source, name) in self._data
+            }
+
+    def put(self, source: str, mapping: Dict[str, str]) -> None:
+        with self._lock:
+            for name, category in mapping.items():
+                self._data[(source, name)] = category
+
+
+_default_tag_category_cache = _InProcessTagCategoryCache()
 
 _RATING = {
     "s": "safe",
@@ -128,6 +166,7 @@ def _gelbooru_style(
     cfg: Dict,
     source: str,
     extra: str = "",
+    category_cache=None,
 ) -> Optional[Dict]:
     ua = cfg["userAgent"]
     delay = cfg["requestDelaySeconds"]
@@ -145,7 +184,7 @@ def _gelbooru_style(
     if not tag_names:
         return None
     categories = _gelbooru_tag_categories(
-        base_url, tag_names, cfg, source, extra
+        base_url, tag_names, cfg, source, extra, category_cache
     )
     tags = [(name, categories.get(name, "general")) for name in tag_names]
     return {
@@ -169,36 +208,104 @@ def _extract_posts(data) -> List[Dict]:
     return []
 
 
-def _gelbooru_tag_categories(
-    base_url: str, names: List[str], cfg: Dict, source: str, extra: str
-) -> Dict[str, str]:
-    """One extra request to resolve tag -> category for a batch of names."""
+def _parse_tag_types(raw: bytes) -> Dict[str, str]:
+    """Map tag name -> canonical category from a Gelbooru-style tag listing,
+    accepting either JSON (gelbooru.com) or XML (rule34.xxx)."""
     result = {}  # type: Dict[str, str]
-    if not names:
+    if not raw:
         return result
-    url = (
-        base_url
-        + "?page=dapi&s=tag&q=index&json=1&limit=%d&names=%s%s"
-        % (len(names), urllib.parse.quote(" ".join(names)), extra)
-    )
+    text = raw.decode("utf-8", "replace").strip()
+    if not text:
+        return result
+
+    entries = None  # type: Optional[List[Dict]]
     try:
-        data = _fetch_json(url, cfg["userAgent"], source, cfg[
-            "requestDelaySeconds"
-        ])
-    except BooruError:
-        return result
-    entries = data
-    if isinstance(data, dict):
-        entries = data.get("tag", [])
-    if not isinstance(entries, list):
-        return result
+        data = json.loads(text)
+    except ValueError:
+        data = None
+    if data is not None:
+        if isinstance(data, dict):
+            data = data.get("tag", [])
+        if isinstance(data, list):
+            entries = data
+    if entries is None:
+        # XML fallback: <tags><tag type=".." name=".."/>...</tags>
+        try:
+            root = ET.fromstring(text)
+            entries = [dict(el.attrib) for el in root.iter("tag")]
+        except ET.ParseError:
+            entries = []
+
     for entry in entries:
         try:
-            result[entry["name"]] = _GELBOORU_TYPE.get(
+            name = entry["name"]
+            category = _GELBOORU_TYPE.get(
                 int(entry.get("type", 0)), "general"
             )
         except (KeyError, TypeError, ValueError):
             continue
+        if name:
+            result[name] = category
+    return result
+
+
+def _gelbooru_tag_categories(
+    base_url: str,
+    names: List[str],
+    cfg: Dict,
+    source: str,
+    extra: str,
+    category_cache=None,
+) -> Dict[str, str]:
+    """Resolve tag -> category, serving from the cache first and querying the
+    booru's tag endpoint only for the tags not yet cached.
+
+    gelbooru.com resolves the whole batch in one request; rule34.xxx has no
+    batch param and returns XML, so it is resolved one tag at a time.
+    """
+    result = {}  # type: Dict[str, str]
+    if not names:
+        return result
+    cache = category_cache or _default_tag_category_cache
+    ua = cfg["userAgent"]
+    delay = cfg["requestDelaySeconds"]
+
+    result.update(cache.get(source, names))
+    uncached = [name for name in names if name not in result]
+    if not uncached:
+        return result
+
+    resolved = {}  # type: Dict[str, str]
+    if _TAG_BATCH_SUPPORT.get(source, False):
+        url = (
+            base_url
+            + "?page=dapi&s=tag&q=index&json=1&limit=%d&names=%s%s"
+            % (len(uncached), urllib.parse.quote(" ".join(uncached)), extra)
+        )
+        try:
+            resolved = _parse_tag_types(_fetch(url, ua, source, delay))
+        except BooruError as ex:
+            logger.warning("tag categories %s (batch): %s", source, ex)
+    else:
+        for name in uncached:
+            url = (
+                base_url
+                + "?page=dapi&s=tag&q=index&json=1&limit=1&name=%s%s"
+                % (urllib.parse.quote(name), extra)
+            )
+            try:
+                raw = _fetch(url, ua, source, delay)
+                resolved.update(_parse_tag_types(raw))
+            except BooruError as ex:
+                # degrade gracefully: an unresolved tag falls back to general
+                logger.warning("tag category %s %r: %s", source, name, ex)
+
+    if resolved:
+        # only cache tags we actually resolved; an unresolved tag stays out of
+        # the cache so a later run can retry it instead of learning "general"
+        cache.put(source, resolved)
+    for name in uncached:
+        result[name] = resolved.get(name, "general")
     return result
 
 
@@ -220,21 +327,37 @@ def _auth_extra(source_cfg: Dict) -> str:
     return ""
 
 
-def _lookup_rule34(md5: str, cfg: Dict) -> Optional[Dict]:
+def _lookup_rule34(
+    md5: str, cfg: Dict, category_cache=None
+) -> Optional[Dict]:
     extra = _auth_extra(_source_cfg(cfg, "rule34"))
     return _gelbooru_style(
-        "https://api.rule34.xxx/index.php", md5, cfg, "rule34", extra
+        "https://api.rule34.xxx/index.php",
+        md5,
+        cfg,
+        "rule34",
+        extra,
+        category_cache,
     )
 
 
-def _lookup_gelbooru(md5: str, cfg: Dict) -> Optional[Dict]:
+def _lookup_gelbooru(
+    md5: str, cfg: Dict, category_cache=None
+) -> Optional[Dict]:
     extra = _auth_extra(_source_cfg(cfg, "gelbooru"))
     return _gelbooru_style(
-        "https://gelbooru.com/index.php", md5, cfg, "gelbooru", extra
+        "https://gelbooru.com/index.php",
+        md5,
+        cfg,
+        "gelbooru",
+        extra,
+        category_cache,
     )
 
 
-def _lookup_danbooru(md5: str, cfg: Dict) -> Optional[Dict]:
+def _lookup_danbooru(
+    md5: str, cfg: Dict, category_cache=None
+) -> Optional[Dict]:
     src = _source_cfg(cfg, "danbooru")
     login = src.get("login") or ""
     api_key = src.get("apiKey") or ""
@@ -281,12 +404,18 @@ _LOOKUPS = {
 }
 
 
-def lookup(source: str, md5: str, cfg: Dict) -> Optional[Dict]:
+def lookup(
+    source: str, md5: str, cfg: Dict, category_cache=None
+) -> Optional[Dict]:
     """Return {'tags': [(name, category)], 'safety': ...} or None if not found.
+
+    `category_cache` (a booru_cache.TagCategoryCache, or any object exposing
+    .get(source, names)/.put(source, mapping)) persists resolved tag
+    categories; when omitted, a process-local cache is used.
 
     Raises BooruRetryError on transient failures and BooruError otherwise.
     """
     fn = _LOOKUPS.get(source)
     if not fn:
         raise BooruError("Unknown booru source: %r" % source)
-    return fn(md5, cfg)
+    return fn(md5, cfg, category_cache)
