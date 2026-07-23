@@ -29,6 +29,9 @@ DEFAULTS = {
         "userAgent": "szurubooru-autotag/1.0",
         "applySafety": False,
         "safetyOnlyIfUnset": True,
+        # move tags already on a post out of the default/general bucket into
+        # their booru category; never overrides a manual categorisation
+        "recategorizeExisting": False,
         "categoryMap": {
             "artist": "artist",
             "character": "character",

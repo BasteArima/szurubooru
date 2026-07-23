@@ -15,6 +15,7 @@ from szurubooru.func import (
     booru,
     booru_cache,
     posts,
+    tag_categories,
     tags,
     versions,
 )
@@ -54,16 +55,37 @@ def _tag_display_name(tag: model.Tag) -> Optional[str]:
     return tag.first_name
 
 
-def _apply_tags(post: model.Post, pairs: List[Tuple[str, str]]) -> int:
+def _set_tag_category(tag: model.Tag, category: str) -> bool:
+    try:
+        tags.update_tag_category_name(tag, category)
+        return True
+    except Exception as ex:  # unknown category -> keep whatever it had
+        logger.warning("auto-tag category %r: %s", category, ex)
+        return False
+
+
+def _apply_tags(
+    post: model.Post,
+    pairs: List[Tuple[str, str]],
+    recategorize_existing: bool = False,
+    neutral_categories: Optional[set] = None,
+) -> int:
     """Add missing tags (with szuru category) to the post; returns count added.
 
-    Only newly-created tags get their category set; existing tags keep theirs
-    so a manual categorisation is never overwritten.
+    Newly-created tags get their category set. Existing tags keep theirs unless
+    `recategorize_existing` is on, in which case a tag still sitting in a
+    "neutral" category (the default / general bucket) is promoted to its booru
+    category — a manual categorisation (any non-neutral category) is never
+    touched, and a tag is never demoted back into the neutral bucket.
     """
+    neutral = neutral_categories or set()
+    existing_by_name = {}  # type: Dict[str, model.Tag]
     current = set()
     for tag in post.tags:
         for tag_name in tag.names:
-            current.add(tag_name.name.lower())
+            low = tag_name.name.lower()
+            current.add(low)
+            existing_by_name[low] = tag
 
     to_add = []  # type: List[Tuple[str, str]]
     seen = set()
@@ -72,9 +94,23 @@ def _apply_tags(post: model.Post, pairs: List[Tuple[str, str]]) -> int:
         if not normalized:
             continue
         low = normalized.lower()
-        if low in current or low in seen:
+        if low in seen:
             continue
         seen.add(low)
+        if low in current:
+            if recategorize_existing and category and category not in neutral:
+                tag = existing_by_name.get(low)
+                current_category = (
+                    tag.category.name if tag is not None and tag.category
+                    else None
+                )
+                if (
+                    tag is not None
+                    and current_category in neutral
+                    and current_category != category
+                ):
+                    _set_tag_category(tag, category)
+            continue
         to_add.append((normalized, category))
 
     if not to_add:
@@ -93,10 +129,7 @@ def _apply_tags(post: model.Post, pairs: List[Tuple[str, str]]) -> int:
             continue
         category = category_by_name.get(name.lower())
         if category:
-            try:
-                tags.update_tag_category_name(tag, category)
-            except Exception as ex:  # unknown category -> keep default
-                logger.warning("auto-tag category %r: %s", category, ex)
+            _set_tag_category(tag, category)
     return len(to_add)
 
 
@@ -186,7 +219,16 @@ def apply_hash(
                 (name, category_map.get(canon, canon) or "general")
                 for name, canon in result["tags"]
             ]
-            added = _apply_tags(post, pairs)
+            recategorize = bool(hash_cfg.get("recategorizeExisting"))
+            neutral = None
+            if recategorize:
+                # categories that count as "not yet categorised": the szuru
+                # default plus whatever booru "general" maps to
+                neutral = {
+                    tag_categories.get_default_category_name(),
+                    category_map.get("general") or "general",
+                }
+            added = _apply_tags(post, pairs, recategorize, neutral)
             _maybe_apply_safety(post, result.get("safety"), hash_cfg)
             return (model.PostAutoTag.STATUS_DONE, source, added)
 

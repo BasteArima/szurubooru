@@ -1,3 +1,4 @@
+from szurubooru import db
 from szurubooru.func import auto_tag, auto_tag_config, booru
 
 
@@ -75,6 +76,75 @@ def test_gelbooru_type_map():
     assert booru._GELBOORU_TYPE[3] == "copyright"
     assert booru._GELBOORU_TYPE[4] == "character"
     assert booru._GELBOORU_TYPE[5] == "meta"
+
+
+def _recat_setup(
+    config_injector, post_factory, tag_factory, tag_category_factory, tag_cat
+):
+    config_injector({"tag_name_regex": ".*"})
+    default_cat = tag_category_factory(name="default", default=True)
+    artist_cat = tag_category_factory(name="artist")
+    db.session.add_all([default_cat, artist_cat])
+    tag = tag_factory(names=["rwt4184"], category=tag_cat(default_cat, artist_cat))
+    db.session.add(tag)
+    post = post_factory()
+    post.tags = [tag]
+    db.session.add(post)
+    db.session.flush()
+    return post, tag
+
+
+def test_apply_tags_recategorizes_neutral_existing_tag(
+    config_injector, post_factory, tag_factory, tag_category_factory
+):
+    post, tag = _recat_setup(
+        config_injector,
+        post_factory,
+        tag_factory,
+        tag_category_factory,
+        lambda d, a: d,
+    )
+    auto_tag._apply_tags(
+        post,
+        [("rwt4184", "artist")],
+        recategorize_existing=True,
+        neutral_categories={"default"},
+    )
+    assert tag.category.name == "artist"
+
+
+def test_apply_tags_preserves_manual_category(
+    config_injector, post_factory, tag_factory, tag_category_factory
+):
+    # tag already in a specific (non-neutral) category is never touched
+    post, tag = _recat_setup(
+        config_injector,
+        post_factory,
+        tag_factory,
+        tag_category_factory,
+        lambda d, a: a,
+    )
+    auto_tag._apply_tags(
+        post,
+        [("rwt4184", "default")],
+        recategorize_existing=True,
+        neutral_categories={"default"},
+    )
+    assert tag.category.name == "artist"
+
+
+def test_apply_tags_recategorize_off_by_default(
+    config_injector, post_factory, tag_factory, tag_category_factory
+):
+    post, tag = _recat_setup(
+        config_injector,
+        post_factory,
+        tag_factory,
+        tag_category_factory,
+        lambda d, a: d,
+    )
+    auto_tag._apply_tags(post, [("rwt4184", "artist")])
+    assert tag.category.name == "default"
 
 
 def test_tag_display_name_uses_names_when_first_name_none():

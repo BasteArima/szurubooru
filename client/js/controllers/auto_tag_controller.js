@@ -25,6 +25,7 @@ const CONFIG_DEFAULTS = {
         userAgent: "szurubooru-autotag/1.0",
         applySafety: false,
         safetyOnlyIfUnset: true,
+        recategorizeExisting: false,
         categoryMap: {
             artist: "artist",
             character: "character",

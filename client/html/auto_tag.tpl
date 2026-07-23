@@ -21,6 +21,7 @@
                     <label class='inline'><input type='checkbox' data-cfg='hash.enabled' data-type='bool' <%- ctx.config.hash.enabled ? 'checked' : '' %>/><span class='checkbox'>Enabled</span></label>
                     <label class='inline'><input type='checkbox' data-cfg='hash.applySafety' data-type='bool' <%- ctx.config.hash.applySafety ? 'checked' : '' %>/><span class='checkbox'>Set safety from rating</span></label>
                     <label class='inline'><input type='checkbox' data-cfg='hash.safetyOnlyIfUnset' data-type='bool' <%- ctx.config.hash.safetyOnlyIfUnset ? 'checked' : '' %>/><span class='checkbox'>…only when still Safe</span></label>
+                    <label class='inline'><input type='checkbox' data-cfg='hash.recategorizeExisting' data-type='bool' <%- ctx.config.hash.recategorizeExisting ? 'checked' : '' %>/><span class='checkbox'>Recategorize existing tags</span></label>
                 </div>
                 <label class='field'><span>Request delay, s</span><input type='number' step='0.1' min='0' data-cfg='hash.requestDelaySeconds' data-type='number' value='<%- ctx.config.hash.requestDelaySeconds %>'/></label>
                 <label class='field'><span>User-Agent</span><input type='text' data-cfg='hash.userAgent' value='<%- ctx.config.hash.userAgent %>'/></label>
