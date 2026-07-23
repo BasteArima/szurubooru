@@ -77,9 +77,19 @@ def _fetch(url: str, user_agent: str, source: str, delay: float) -> bytes:
         "User-Agent", user_agent or "szurubooru-autotag/1.0"
     )
     request.add_header("Accept", "application/json")
+    # NB: never log `url` — it contains the api_key
+    logger.info("booru %s: requesting", source)
+    started = time.monotonic()
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return response.read()
+        with urllib.request.urlopen(request, timeout=15) as response:
+            data = response.read()
+        logger.info(
+            "booru %s: %d bytes in %.1fs",
+            source,
+            len(data),
+            time.monotonic() - started,
+        )
+        return data
     except urllib.error.HTTPError as ex:
         if ex.code == 429 or ex.code >= 500:
             raise BooruRetryError(

@@ -160,6 +160,13 @@ def _run_job(
                     _set_status(job_id, Job.STATUS_CANCELLED)
                     return
 
+            logger.info(
+                "auto-tag job %d: post %d (%d/%d)",
+                job_id,
+                post_id,
+                processed + 1,
+                len(ids),
+            )
             post = db.session.query(model.Post).get(post_id)
             if post is not None:
                 run_methods = auto_tag.should_run_methods(
