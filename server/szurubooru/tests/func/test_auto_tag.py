@@ -1,4 +1,4 @@
-from szurubooru.func import auto_tag_config, booru
+from szurubooru.func import auto_tag, auto_tag_config, booru
 
 
 def test_deep_merge_overrides_and_preserves():
@@ -75,6 +75,32 @@ def test_gelbooru_type_map():
     assert booru._GELBOORU_TYPE[3] == "copyright"
     assert booru._GELBOORU_TYPE[4] == "character"
     assert booru._GELBOORU_TYPE[5] == "meta"
+
+
+def test_tag_display_name_uses_names_when_first_name_none():
+    # a freshly-created tag has first_name (a deferred SQL column_property) None
+    # until it is flushed, but its `names` relationship is populated in memory;
+    # reading first_name there used to crash on None.lower()
+    class _Name:
+        def __init__(self, name):
+            self.name = name
+
+    class _Tag:
+        names = [_Name("firefly_(honkai:_star_rail)")]
+        first_name = None
+
+    assert (
+        auto_tag._tag_display_name(_Tag())
+        == "firefly_(honkai:_star_rail)"
+    )
+
+
+def test_tag_display_name_falls_back_to_first_name():
+    class _Tag:
+        names = []
+        first_name = "existing_tag"
+
+    assert auto_tag._tag_display_name(_Tag()) == "existing_tag"
 
 
 def test_parse_tag_types_rule34_xml():

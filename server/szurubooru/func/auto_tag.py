@@ -44,6 +44,16 @@ def _normalize(name: str) -> Optional[str]:
     return name
 
 
+def _tag_display_name(tag: model.Tag) -> Optional[str]:
+    """A tag's name read from the in-memory `names` relationship. Needed because
+    `Tag.first_name` is a deferred SQL column_property that stays None until the
+    tag is flushed, so it is unusable on the freshly-created tags returned by
+    update_post_tags (reading it there raised AttributeError on None)."""
+    if getattr(tag, "names", None):
+        return tag.names[0].name
+    return tag.first_name
+
+
 def _apply_tags(post: model.Post, pairs: List[Tuple[str, str]]) -> int:
     """Add missing tags (with szuru category) to the post; returns count added.
 
@@ -70,13 +80,18 @@ def _apply_tags(post: model.Post, pairs: List[Tuple[str, str]]) -> int:
     if not to_add:
         return 0
 
-    current_names = [tag.first_name for tag in post.tags]
+    current_names = [
+        name for name in map(_tag_display_name, post.tags) if name
+    ]
     new_tags = posts.update_post_tags(
         post, current_names + [name for name, _ in to_add]
     )
     category_by_name = {name.lower(): category for name, category in to_add}
     for tag in new_tags:
-        category = category_by_name.get(tag.first_name.lower())
+        name = _tag_display_name(tag)
+        if not name:
+            continue
+        category = category_by_name.get(name.lower())
         if category:
             try:
                 tags.update_tag_category_name(tag, category)
