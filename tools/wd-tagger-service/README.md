@@ -1,0 +1,166 @@
+# szurubooru WD tagger service
+
+A small standalone microservice that runs the **WD v3 tagger** (SmilingWolf) on
+a GPU PC and answers the HTTP contract szurubooru's auto-tag **`ai`** method
+speaks. It is **not** part of the szurubooru server/client Docker images — it
+runs on your GPU machine and is turned on on-demand before an AI-tagging batch.
+
+szurubooru is agnostic to what is behind the URL: this FastAPI service is the
+primary path, and **ComfyUI** (WD14 node) is a documented fallback that speaks
+the same contract (see below).
+
+---
+
+## HTTP contract
+
+```
+POST /tag
+  header:  X-Auth-Token: <token>                     (if WD_AUTH_TOKEN is set)
+  body:    the raw image bytes            (Content-Type: image/*)
+           - or - multipart/form-data with a `file` field
+  query:   general_threshold, character_threshold    (both optional floats)
+
+  200 ->  {
+            "model": "wd-vit-large-tagger-v3",
+            "rating":    { "general": 0.82, "sensitive": 0.15, ... },
+            "general":   { "1girl": 0.99, "long_hair": 0.88, ... },   # >= general_threshold
+            "character": { "hatsune_miku": 0.97, ... }                # >= character_threshold
+          }
+
+GET /health -> { "status": "ok", "model": "...", "providers": [...], "gpu": true }
+```
+
+`rating` is always the full set (4 values); `general` and `character` contain
+only tags at or above the given thresholds.
+
+---
+
+## Requirements
+
+- An NVIDIA GPU + recent driver. Tested target: **RTX 5070 Ti (Blackwell,
+  sm_120), CUDA 12.8**.
+- **Python 3.10–3.12**.
+- ~2 GB free VRAM (the WD v3 models are small).
+
+## Install
+
+```bash
+cd tools/wd-tagger-service
+python -m venv venv
+# Windows:  venv\Scripts\activate
+# Linux:    source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### ⚠️ Blackwell / CUDA 12.8 notes (read this)
+
+`onnxruntime-gpu` from PyPI must match your CUDA toolkit. On a 50-series
+(Blackwell / sm_120) card:
+
+1. Install an `onnxruntime-gpu` built for **CUDA 12.x** (the current PyPI
+   `onnxruntime-gpu` targets CUDA 12). You also need matching **cuDNN 9** on the
+   `PATH` (CUDA 12.8's cuDNN is fine).
+2. Start the service and check `GET /health` → `"gpu": true`. On startup the log
+   prints the active providers.
+3. **If `CUDAExecutionProvider` fails to initialise** (you'll see a warning and
+   `"gpu": false`), the service still runs on CPU (slow, fine for a smoke test).
+   For real throughput on the 50-series either:
+   - install a newer `onnxruntime-gpu` that supports sm_120, **or**
+   - use the **ComfyUI fallback** below (your ComfyUI already runs on this card).
+
+The service never crashes on a missing GPU — it degrades to CPU and warns.
+
+## Download the model
+
+```bash
+python download_model.py
+```
+
+Pulls `model.onnx` + `selected_tags.csv` into `./model`. Pick a model via
+`WD_MODEL_REPO` (see the top of `download_model.py`):
+
+| repo | notes |
+|------|-------|
+| `SmilingWolf/wd-vit-large-tagger-v3` | balanced (default) |
+| `SmilingWolf/wd-eva02-large-tagger-v3` | highest quality, a little slower |
+| `SmilingWolf/wd-swinv2-tagger-v3` | fast |
+
+## Configure & run
+
+Copy `.env.example` to `.env` and set at least `WD_AUTH_TOKEN`. Then:
+
+```bash
+# Windows
+run.bat
+# Linux / macOS
+./run.sh
+# or directly
+python -m uvicorn app:app --env-file .env --host 0.0.0.0 --port 7860
+```
+
+### Config (env vars)
+
+| var | default | meaning |
+|-----|---------|---------|
+| `WD_AUTH_TOKEN` | *(empty)* | shared secret; empty = **no auth** (LAN only) |
+| `WD_MODEL_DIR` | `./model` | dir with `model.onnx` + `selected_tags.csv` |
+| `WD_MODEL_REPO` | `SmilingWolf/wd-vit-large-tagger-v3` | download source |
+| `WD_GENERAL_THRESHOLD` | `0.35` | default general threshold |
+| `WD_CHARACTER_THRESHOLD` | `0.75` | default character threshold |
+| `WD_HOST` / `WD_PORT` | `0.0.0.0` / `7860` | bind address / port |
+| `WD_MAX_IMAGE_BYTES` | `67108864` | reject bodies larger than this |
+
+## Smoke test
+
+```bash
+curl http://localhost:7860/health
+
+curl -s -X POST "http://localhost:7860/tag?general_threshold=0.35&character_threshold=0.75" \
+     -H "X-Auth-Token: <your-token>" \
+     --data-binary @some_image.jpg | python -m json.tool
+```
+
+---
+
+## Hooking it up to szurubooru
+
+In the szurubooru **Auto-tag** admin tab, AI tagger section:
+
+- **Service URL**: `http://<gpu-pc-lan-ip>:7860/tag`
+- **Token**: the same value as `WD_AUTH_TOKEN`
+- thresholds: general ≈ 0.35, character ≈ 0.75
+
+(The szuru-side `ai` method that calls this is the next delivery step; until it
+is wired, this service can be exercised directly with `curl`.)
+
+## Start-before-a-batch checklist
+
+1. Power on the GPU PC.
+2. `cd tools/wd-tagger-service` → activate the venv → `run.bat` / `./run.sh`.
+3. `curl .../health` → confirm `"gpu": true`.
+4. In szurubooru, run an auto-tag job with the **AI** method enabled.
+5. Stop the service when the batch is done.
+
+---
+
+## ComfyUI fallback (same contract)
+
+If `onnxruntime-gpu` will not drive the 50-series, run the tagger through your
+existing ComfyUI instead — szurubooru only cares that the URL answers the
+contract above.
+
+- Install the **WD14 Tagger** custom node (e.g. `pythongosssss/ComfyUI-WD14-Tagger`)
+  in ComfyUI; it downloads the same SmilingWolf WD v3 models.
+- Build an API workflow: *Load Image → WD14 Tagger → output tags/scores*.
+- Put a thin adapter in front of ComfyUI's `/prompt` API that accepts the
+  `POST /tag` request, runs the workflow, and reshapes ComfyUI's response into
+  the `{model, rating, general, character}` JSON above. Point szurubooru at the
+  adapter's URL.
+
+This keeps szurubooru unchanged; only the thing behind the URL differs.
+
+## Security
+
+- Bind to the LAN and **set `WD_AUTH_TOKEN`**. The token is the only gate.
+- Do not expose the port to the internet.
+- The service only reads images and returns tags; it writes nothing.

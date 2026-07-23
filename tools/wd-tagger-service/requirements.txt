@@ -1,0 +1,11 @@
+# WD tagger microservice. Install onnxruntime-gpu that matches your CUDA
+# toolkit (see the README's "Blackwell / CUDA 12.8" notes). If the GPU provider
+# will not initialise on your card, swap onnxruntime-gpu for onnxruntime (CPU)
+# to at least run, or use the ComfyUI fallback.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+onnxruntime-gpu>=1.20
+numpy>=1.24
+pillow>=10.0
+huggingface_hub>=0.23
+python-multipart>=0.0.9
