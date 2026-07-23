@@ -80,6 +80,16 @@ function _mergeDefaults(def, cfg) {
     return out;
 }
 
+// cache-buster: the poll/config GETs use a constant URL, which the browser
+// happily serves from cache, freezing the status. A changing param defeats it.
+function _configLink() {
+    return uri.formatApiLink("auto-tag", "config", { t: Date.now() });
+}
+
+function _jobLink() {
+    return uri.formatApiLink("auto-tag", "job", { t: Date.now() });
+}
+
 class AutoTagController {
     constructor() {
         if (!api.hasPrivilege("posts:autoTag")) {
@@ -93,8 +103,8 @@ class AutoTagController {
         this._pollTimer = null;
 
         Promise.all([
-            api.get(uri.formatApiLink("auto-tag", "config")),
-            api.get(uri.formatApiLink("auto-tag", "job")),
+            api.get(_configLink()),
+            api.get(_jobLink()),
         ]).then(
             ([configResponse, jobResponse]) => {
                 this._installView(configResponse.config, jobResponse.job);
@@ -132,7 +142,7 @@ class AutoTagController {
             (response) => {
                 // re-render from the authoritative saved config, so what you
                 // see afterwards is exactly what was persisted
-                api.get(uri.formatApiLink("auto-tag", "job")).then(
+                api.get(_jobLink()).then(
                     (jobResponse) => {
                         this._installView(response.config, jobResponse.job);
                         this._view.showSuccess("Settings saved.");
@@ -199,7 +209,7 @@ class AutoTagController {
             this._stopPolling();
             return;
         }
-        api.get(uri.formatApiLink("auto-tag", "job")).then(
+        api.get(_jobLink()).then(
             (response) => {
                 try {
                     this._view.updateJob(response.job);
