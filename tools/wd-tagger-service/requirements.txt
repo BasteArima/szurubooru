@@ -1,10 +1,15 @@
-# WD tagger microservice. Install onnxruntime-gpu that matches your CUDA
-# toolkit (see the README's "Blackwell / CUDA 12.8" notes). If the GPU provider
-# will not initialise on your card, swap onnxruntime-gpu for onnxruntime (CPU)
-# to at least run, or use the ComfyUI fallback.
+# WD tagger microservice.
+#
+# onnxruntime-gpu is pinned to the CUDA 12.x line because the default target
+# (CUDA 12.8) is what this project assumes. The newest onnxruntime-gpu (1.23+)
+# is built for CUDA 13 and will fail with "cublasLt64_13.dll missing / Require
+# CUDA 13.*" on a CUDA 12.8 box, then fall back to CPU. Keep it <1.23 unless you
+# actually have the CUDA 13 toolkit installed. See the README (Blackwell / CUDA
+# notes) if the GPU provider still won't initialise; the service runs on CPU
+# regardless, and the ComfyUI fallback is documented there.
 fastapi>=0.110
 uvicorn[standard]>=0.29
-onnxruntime-gpu>=1.20
+onnxruntime-gpu>=1.20,<1.23
 numpy>=1.24
 pillow>=10.0
 huggingface_hub>=0.23

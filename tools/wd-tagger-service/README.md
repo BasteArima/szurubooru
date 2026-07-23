@@ -54,19 +54,35 @@ pip install -r requirements.txt
 
 ### ⚠️ Blackwell / CUDA 12.8 notes (read this)
 
-`onnxruntime-gpu` from PyPI must match your CUDA toolkit. On a 50-series
-(Blackwell / sm_120) card:
+`onnxruntime-gpu` from PyPI must match your **CUDA toolkit version**, and this
+is the #1 gotcha.
 
-1. Install an `onnxruntime-gpu` built for **CUDA 12.x** (the current PyPI
-   `onnxruntime-gpu` targets CUDA 12). You also need matching **cuDNN 9** on the
-   `PATH` (CUDA 12.8's cuDNN is fine).
-2. Start the service and check `GET /health` → `"gpu": true`. On startup the log
-   prints the active providers.
-3. **If `CUDAExecutionProvider` fails to initialise** (you'll see a warning and
-   `"gpu": false`), the service still runs on CPU (slow, fine for a smoke test).
-   For real throughput on the 50-series either:
-   - install a newer `onnxruntime-gpu` that supports sm_120, **or**
-   - use the **ComfyUI fallback** below (your ComfyUI already runs on this card).
+**Symptom (CUDA-version mismatch):** startup logs something like
+```
+Error loading "...onnxruntime_providers_cuda.dll" which depends on
+"cublasLt64_13.dll" which is missing.
+Failed to create CUDAExecutionProvider. Require cuDNN 9.* and CUDA 13.*
+... providers=['CPUExecutionProvider']
+```
+`cublasLt64_13.dll` is a **CUDA 13** library. It means pip installed the newest
+`onnxruntime-gpu` (1.23+, built for CUDA 13) while you have **CUDA 12.8**. The
+service then falls back to CPU.
+
+**Fix (use a CUDA 12 build):**
+```bash
+pip install --force-reinstall "onnxruntime-gpu>=1.20,<1.23"
+```
+(requirements.txt already pins this; the `--force-reinstall` replaces a 1.23+
+that a previous run may have pulled.) Then make sure **CUDA 12.8** and
+**cuDNN 9** DLLs are on your `PATH`.
+
+**Verify:** `GET /health` → `"gpu": true` (startup log also prints the active
+providers).
+
+**If the CUDA provider still won't initialise** (kernels not built for sm_120,
+missing cuDNN, etc.) the service keeps running on **CPU** — fine for testing and
+light use, slow for a large backfill. For guaranteed GPU on the 50-series, use
+the **ComfyUI fallback** below (your ComfyUI already runs on this card).
 
 The service never crashes on a missing GPU — it degrades to CPU and warns.
 
