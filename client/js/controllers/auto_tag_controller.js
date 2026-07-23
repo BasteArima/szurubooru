@@ -108,6 +108,7 @@ class AutoTagController {
             api.get(_jobLink()),
         ]).then(
             ([configResponse, jobResponse]) => {
+                this._serverVersion = configResponse.serverVersion;
                 this._installView(configResponse.config, jobResponse.job);
             },
             (error) => {
@@ -121,6 +122,7 @@ class AutoTagController {
         this._view = new AutoTagView({
             config: _mergeDefaults(CONFIG_DEFAULTS, config),
             job: job,
+            serverVersion: this._serverVersion,
         });
         this._view.addEventListener("saveSettings", (e) =>
             this._evtSaveSettings(e)

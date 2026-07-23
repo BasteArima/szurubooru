@@ -22,7 +22,13 @@ class AutoTagView extends events.EventTarget {
     constructor(ctx) {
         super();
         this._hostNode = document.getElementById("content-holder");
-        views.replaceContent(this._hostNode, template({ config: ctx.config }));
+        views.replaceContent(
+            this._hostNode,
+            template({
+                config: ctx.config,
+                serverVersion: ctx.serverVersion,
+            })
+        );
         views.syncScrollPosition();
 
         this._settingsFormNode.addEventListener("submit", (e) => {

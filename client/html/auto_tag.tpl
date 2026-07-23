@@ -1,6 +1,6 @@
 <div class='content-wrapper' id='auto-tag'>
     <div class='messages'></div>
-    <h1>Auto-tag</h1>
+    <h1>Auto-tag<% if (ctx.serverVersion) { %> <span class='server-version' title='server image commit'><%- String(ctx.serverVersion).substring(0, 7) %></span><% } %></h1>
 
     <form class='auto-tag-settings'>
         <div class='settings-grid'>

@@ -1,3 +1,4 @@
+import os
 from typing import Dict
 
 from szurubooru import rest
@@ -9,13 +10,20 @@ from szurubooru.func import (
     posts,
 )
 
+# the git commit the running server image was built from (see server/Dockerfile
+# + the SOURCE_COMMIT build-arg the CI passes); "dev" when run from source
+SERVER_VERSION = os.environ.get("SOURCE_COMMIT", "dev")
+
 
 @rest.routes.get("/auto-tag/config/?")
 def get_config(
     ctx: rest.Context, _params: Dict[str, str] = {}
 ) -> rest.Response:
     auth.verify_privilege(ctx.user, "posts:auto_tag")
-    return {"config": auto_tag_config.get_public_config()}
+    return {
+        "config": auto_tag_config.get_public_config(),
+        "serverVersion": SERVER_VERSION,
+    }
 
 
 @rest.routes.put("/auto-tag/config/?")

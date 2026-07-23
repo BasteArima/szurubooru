@@ -127,6 +127,8 @@ VOLUME ["/data/"]
 ARG DOCKER_REPO
 ARG BUILD_DATE
 ARG SOURCE_COMMIT
+# keep the built commit available at runtime so the API can report it
+ENV SOURCE_COMMIT=${SOURCE_COMMIT}
 LABEL \
     maintainer="" \
     org.opencontainers.image.title="${DOCKER_REPO}" \
